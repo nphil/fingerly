@@ -37,9 +37,12 @@ class NoteHighwayView(
     private val score: Score,
     /** Injects a synthetic MIDI event (type, note, velocity) — see [autoplay]. */
     private val inject: (Int, Int, Int) -> Unit = { _, _, _ -> },
+    /** Widened at slow practice tempos so beginners aren't punished by ±150ms. */
+    hitWindowMs: Long = 150,
+    missAfterMs: Long = 300,
 ) : View(context), Choreographer.FrameCallback {
 
-    private val judge = HitJudge(score.notes)
+    private val judge = HitJudge(score.notes, hitWindowMs, missAfterMs)
     private val notes: List<ChartNote> = score.notes
 
     /**
@@ -79,6 +82,9 @@ class NoteHighwayView(
     /** Per-frame key guidance: 0 none, 1 right-hand note due now, 2 left-hand. */
     private val keyDue = IntArray(128)
 
+    /** Red = wrong key, and nothing else: flash deadline per key (nanos). */
+    private val wrongKeyUntil = LongArray(128)
+
     // --- notes draw state ---
     private var drawFrom = 0
     private val noteRect = RectF()
@@ -115,7 +121,9 @@ class NoteHighwayView(
     private val rightNotePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.rgb(0, 230, 118) }
     private val leftNotePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.rgb(64, 196, 255) }
     private val hitNotePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.rgb(245, 245, 240) }
-    private val missNotePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.rgb(120, 40, 40) }
+    // Missed notes fade to gray — red is reserved for "wrong key pressed".
+    private val missNotePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.rgb(95, 100, 106) }
+    private val wrongKeyPaint = Paint().apply { color = Color.rgb(229, 57, 53) }
     private val particlePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.rgb(0, 230, 118) }
     private val dueRightPaint = Paint().apply { color = Color.rgb(0, 145, 75) }
     private val dueLeftPaint = Paint().apply { color = Color.rgb(36, 118, 158) }
@@ -146,9 +154,13 @@ class NoteHighwayView(
             MidiEvent.TYPE_NOTE_ON -> {
                 if (event.data1 < 128) pressed[event.data1] = true
                 if (!ended) {
-                    val evSongMs = (event.timestampNanos - anchorNanos) / 1_000_000 - LEAD_IN_MS
+                    val evSongMs = (event.timestampNanos - anchorNanos) / 1_000_000 - leadInMs
                     val idx = judge.onNoteOn(event.data1, evSongMs)
-                    if (idx >= 0) spawnBurst(noteX[event.data1], keyboardTop, HIT_BURST)
+                    if (idx >= 0) {
+                        spawnBurst(noteX[event.data1], keyboardTop, HIT_BURST)
+                    } else if (event.data1 < 128) {
+                        wrongKeyUntil[event.data1] = event.timestampNanos + WRONG_FLASH_NANOS
+                    }
                 }
             }
 
@@ -194,6 +206,7 @@ class NoteHighwayView(
         java.util.Arrays.fill(autoOnSent, false)
         java.util.Arrays.fill(autoOffSent, false)
         java.util.Arrays.fill(pressed, false)
+        java.util.Arrays.fill(wrongKeyUntil, 0L)
         rebuildHud()
     }
 
@@ -392,6 +405,7 @@ class NoteHighwayView(
     }
 
     private fun whiteKeyPaintFor(n: Int): Paint = when {
+        System.nanoTime() < wrongKeyUntil[n] -> wrongKeyPaint
         pressed[n] -> pressedPaint
         keyDue[n] == 1 -> dueRightPaint
         keyDue[n] == 2 -> dueLeftPaint
@@ -399,6 +413,7 @@ class NoteHighwayView(
     }
 
     private fun blackKeyPaintFor(n: Int): Paint = when {
+        System.nanoTime() < wrongKeyUntil[n] -> wrongKeyPaint
         pressed[n] -> pressedPaint
         keyDue[n] == 1 -> dueRightPaint
         keyDue[n] == 2 -> dueLeftPaint
@@ -533,6 +548,7 @@ class NoteHighwayView(
         private const val GRAVITY = 1500f
         private const val AUTOPLAY_VELOCITY = 80
         private const val WARMUP_FRAMES = 12 // ~100ms @120Hz
+        private const val WRONG_FLASH_NANOS = 450_000_000L
         private val C_LABELS = arrayOf("C1", "C2", "C3", "C4", "C5", "C6", "C7", "C8")
     }
 }

@@ -153,13 +153,19 @@ fun SessionScreen(engine: MidiEngine, score: Score, onExit: () -> Unit) {
                 AndroidView(
                     modifier = Modifier.fillMaxSize(),
                     factory = { ctx ->
-                        NoteHighwayView(ctx, engine.ring, state.practice, engine::injectVirtual)
-                            .apply {
-                                tapToRestart = false
-                                leadInMs = 2000
-                                autoplay = state.listen
-                                onEnded = { judge -> onRunEnded(state.step, judge, state.listen) }
-                            }
+                        // Slower rungs get a proportionally wider hit window so
+                        // beginners aren't punished by performance-grade timing.
+                        val window = (150.0 / state.step.setting.tempoMultiplier)
+                            .toLong().coerceAtMost(300L)
+                        NoteHighwayView(
+                            ctx, engine.ring, state.practice, engine::injectVirtual,
+                            hitWindowMs = window, missAfterMs = window * 2,
+                        ).apply {
+                            tapToRestart = false
+                            leadInMs = 2000
+                            autoplay = state.listen
+                            onEnded = { judge -> onRunEnded(state.step, judge, state.listen) }
+                        }
                     },
                 )
                 Text(
@@ -210,6 +216,11 @@ private fun BriefingContent(
             if (diagnostic != null) {
                 Text(diagnostic, color = Color(0xFF78828C))
             }
+            Text(
+                "Press the key when it lights up. Tap or hold — only the press is graded.",
+                color = Color(0xFF78828C),
+                style = MaterialTheme.typography.bodyMedium,
+            )
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 Button(onClick = onStart) { Text("Play") }
                 OutlinedButton(onClick = onListen) { Text("Listen first") }
