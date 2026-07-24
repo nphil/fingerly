@@ -15,7 +15,7 @@ import androidx.room.RoomDatabase
         SrsCardEntity::class,
         AppSettingEntity::class,
     ],
-    version = 2,
+    version = 3,
     exportSchema = true,
 )
 abstract class FingerlyDatabase : RoomDatabase() {

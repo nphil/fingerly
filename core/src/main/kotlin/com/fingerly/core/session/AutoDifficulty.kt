@@ -30,26 +30,26 @@ object AutoDifficulty {
         } else {
             com.fingerly.core.song.ChartNote.HAND_LEFT
         }
+        // Each adjacent pair differs on exactly ONE axis (or drops back to wait
+        // mode when new content appears): master a hand's keys in wait mode,
+        // time the SAME notes slowly, speed up, switch hands the same way,
+        // then combine hands. Never two new demands at once.
         return listOf(
-            PracticeSetting(1.0, HAND_BOTH, all),
-            PracticeSetting(0.85, HAND_BOTH, all),
-            PracticeSetting(0.7, HAND_BOTH, all),
-            PracticeSetting(0.55, HAND_BOTH, all),
-            PracticeSetting(0.7, strongerHand, all),
-            PracticeSetting(0.7, weakerHand, all),
-            PracticeSetting(0.55, strongerHand, all),
-            PracticeSetting(0.55, weakerHand, all),
-            PracticeSetting(0.55, strongerHand, half),
-            PracticeSetting(0.55, weakerHand, half),
-            // Wait-mode rungs: key-finding before any timing pressure. The
-            // song pauses at each note until the right key is pressed.
-            PracticeSetting(0.7, strongerHand, all, wait = true),
-            PracticeSetting(0.7, weakerHand, all, wait = true),
-            PracticeSetting(0.7, weakerHand, half, wait = true),
+            PracticeSetting(1.0, HAND_BOTH, all), // 0: performance target
+            PracticeSetting(0.85, HAND_BOTH, all), // 1
+            PracticeSetting(0.7, HAND_BOTH, all), // 2
+            PracticeSetting(0.55, HAND_BOTH, all), // 3: both hands, slow
+            PracticeSetting(0.7, weakerHand, all), // 4
+            PracticeSetting(0.55, weakerHand, all), // 5: weak hand, timed slow
+            PracticeSetting(0.7, weakerHand, all, wait = true), // 6: weak hand keys
+            PracticeSetting(0.7, strongerHand, all), // 7
+            PracticeSetting(0.55, strongerHand, all), // 8: strong hand, timed slow
+            PracticeSetting(0.7, strongerHand, all, wait = true), // 9
+            PracticeSetting(0.7, strongerHand, half, wait = true), // 10: first contact
         )
     }
 
-    /** Rung a passage with no history starts on: one hand, slow, all bars. */
+    /** Legacy resume cap kept for attempt-history mapping. */
     const val FRESH_START_INDEX = 6
 
     /** Below this the attempt collapsed: decompose fast, not one rung at a time. */

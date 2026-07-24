@@ -391,6 +391,11 @@ class NoteHighwayView(
         drawNotes(canvas)
         drawParticles(canvas)
         drawKeyboard(canvas)
+        // Beat pulse: the hit line brightens on every beat so timed reps have a
+        // visible rhythm reference (also runs through the lead-in as a count-in).
+        val beatMs = (60_000.0 / score.tempoBpm).toLong().coerceAtLeast(1)
+        val phase = ((songMs % beatMs) + beatMs) % beatMs
+        hitLinePaint.alpha = if (waitingNow) 255 else (255 - phase * 185 / beatMs).toInt()
         canvas.drawLine(0f, keyboardTop, width.toFloat(), keyboardTop, hitLinePaint)
         canvas.drawText(hudLine, 0, hudLine.length, 24f, 48f, hudPaint)
         canvas.drawText(perfLine, 0, perfLine.length, 24f, 96f, hudPaint)

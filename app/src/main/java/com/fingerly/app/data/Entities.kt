@@ -98,6 +98,8 @@ data class PassageAttemptEntity(
     val rightHandAccuracy: Float,
     /** "LEFT", "RIGHT" or "BOTH" — hands may be split by auto-difficulty (SPEC §3). */
     val handMode: String,
+    /** True when the run used wait mode (untimed key-finding). */
+    val waitMode: Boolean,
 )
 
 /** Recorded MIDI of a session/passage for before-vs-after playback (SPEC §3). */

@@ -139,6 +139,7 @@ class SessionRepository(private val db: FingerlyDatabase) {
                 leftHandAccuracy = result.leftAccuracy,
                 rightHandAccuracy = result.rightAccuracy,
                 handMode = handModeName(setting.hand),
+                waitMode = setting.wait,
             ),
         )
         db.srsCardDao().upsert(
@@ -162,13 +163,14 @@ class SessionRepository(private val db: FingerlyDatabase) {
         else -> "BOTH"
     }
 
-    /** Approximate the ladder rung an old attempt ran at, from its stored setting. */
+    /** The ladder rung an old attempt ran at, reconstructed from its stored setting. */
     private fun ladderIndexOf(a: PassageAttemptEntity): Int = when {
         a.handMode == "BOTH" && a.tempoMultiplier >= 0.99f -> 0
         a.handMode == "BOTH" && a.tempoMultiplier >= 0.84f -> 1
         a.handMode == "BOTH" && a.tempoMultiplier >= 0.69f -> 2
         a.handMode == "BOTH" -> 3
-        a.tempoMultiplier >= 0.69f -> 5
-        else -> 7
+        a.waitMode -> 9 // wait rungs; exact hand/bars nuance not needed for resume
+        a.tempoMultiplier >= 0.69f -> 7
+        else -> 8
     }
 }
