@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -28,17 +29,32 @@ import com.fingerly.core.song.Score
 fun HighwayScreen(engine: MidiEngine, score: Score, onBack: () -> Unit) {
     var view by remember { mutableStateOf<NoteHighwayView?>(null) }
     var perfMode by remember { mutableStateOf(false) }
+    var autoplay by remember { mutableStateOf(false) }
+
+    // Autoplay routes through the demo synth so the piece is audible; make sure
+    // the synth dies with the screen.
+    DisposableEffect(Unit) {
+        onDispose { engine.setDemoSoundEnabled(false) }
+    }
 
     Box(Modifier.fillMaxSize()) {
         AndroidView(
             modifier = Modifier.fillMaxSize(),
-            factory = { ctx -> NoteHighwayView(ctx, engine.ring, score).also { view = it } },
+            factory = { ctx ->
+                NoteHighwayView(ctx, engine.ring, score, inject = engine::injectVirtual)
+                    .also { view = it }
+            },
         )
         BackText(onBack)
         Row(
             modifier = Modifier.align(Alignment.TopEnd).padding(16.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
+            OutlinedButton(onClick = {
+                autoplay = !autoplay
+                view?.autoplay = autoplay
+                engine.setDemoSoundEnabled(autoplay)
+            }) { Text(if (autoplay) "Autoplay: on" else "Autoplay") }
             OutlinedButton(onClick = {
                 perfMode = !perfMode
                 view?.perfTestMode = perfMode

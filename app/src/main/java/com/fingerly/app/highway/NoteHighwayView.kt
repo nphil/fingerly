@@ -35,10 +35,22 @@ class NoteHighwayView(
     context: Context,
     private val ring: MidiEventRing,
     private val score: Score,
+    /** Injects a synthetic MIDI event (type, note, velocity) — see [autoplay]. */
+    private val inject: (Int, Int, Int) -> Unit = { _, _, _ -> },
 ) : View(context), Choreographer.FrameCallback {
 
     private val judge = HitJudge(score.notes)
     private val notes: List<ChartNote> = score.notes
+
+    /**
+     * Autoplay: the chart plays itself through the real MIDI pipeline (inject →
+     * ring → judge), so sync, hit detection, and rewards can be verified without
+     * any piano skill. Also how "listen before you play" will work later (§3).
+     */
+    var autoplay = false
+    private val autoOnSent = BooleanArray(notes.size)
+    private val autoOffSent = BooleanArray(notes.size)
+    private var autoFrom = 0
 
     // --- clock ---
     private var anchorNanos = 0L
@@ -152,8 +164,32 @@ class NoteHighwayView(
         droppedFrames = 0
         worstFrameMs = 0f
         lastJudgedTotal = -1
+        autoFrom = 0
+        java.util.Arrays.fill(autoOnSent, false)
+        java.util.Arrays.fill(autoOffSent, false)
         java.util.Arrays.fill(pressed, false)
         rebuildHud()
+    }
+
+    /** Emits due autoplay note-ons/offs into the MIDI pipeline. Allocation-free. */
+    private fun pumpAutoplay() {
+        var i = autoFrom
+        while (i < notes.size) {
+            val startMs = (notes[i].startSeconds * 1000).toLong()
+            if (startMs > songMs) break
+            if (!autoOnSent[i]) {
+                autoOnSent[i] = true
+                inject(MidiEvent.TYPE_NOTE_ON, notes[i].midiNote, AUTOPLAY_VELOCITY)
+            }
+            if (!autoOffSent[i] &&
+                startMs + (notes[i].durationSeconds * 1000).toLong() <= songMs
+            ) {
+                autoOffSent[i] = true
+                inject(MidiEvent.TYPE_NOTE_OFF, notes[i].midiNote, 0)
+            }
+            i++
+        }
+        while (autoFrom < notes.size && autoOffSent[autoFrom]) autoFrom++
     }
 
     override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
@@ -206,6 +242,7 @@ class NoteHighwayView(
         lastFrameNanos = frameTimeNanos
 
         songMs = (frameTimeNanos - anchorNanos) / 1_000_000 - LEAD_IN_MS
+        if (autoplay && !ended) pumpAutoplay()
         ring.drain(drainHandler)
         if (!ended) {
             judge.advanceTo(songMs)
@@ -446,5 +483,6 @@ class NoteHighwayView(
         private const val PERF_TARGET_PARTICLES = 200
         private const val HIT_BURST = 24
         private const val GRAVITY = 1500f
+        private const val AUTOPLAY_VELOCITY = 80
     }
 }
