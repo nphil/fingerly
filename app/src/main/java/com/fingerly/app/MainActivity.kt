@@ -1,5 +1,6 @@
 package com.fingerly.app
 
+import android.content.Intent
 import android.os.Build
 import android.os.Bundle
 import android.view.WindowManager
@@ -12,10 +13,19 @@ import com.fingerly.app.display.DisplayModes
 import com.fingerly.app.log.RemoteLog
 import com.fingerly.app.midi.MidiEngine
 import com.fingerly.app.ui.FingerlyApp
+import kotlinx.coroutines.flow.MutableStateFlow
 
 class MainActivity : ComponentActivity() {
 
     private lateinit var midiEngine: MidiEngine
+
+    /** Bumped on every launcher relaunch: the app must reopen into today's session (SPEC §1). */
+    private val relaunchSignal = MutableStateFlow(0)
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        relaunchSignal.value++
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -39,6 +49,7 @@ class MainActivity : ComponentActivity() {
             FingerlyApp(
                 engine = midiEngine,
                 currentRefreshRate = { DisplayModes.currentRefreshRate(this) },
+                relaunchSignal = relaunchSignal,
             )
         }
     }

@@ -7,6 +7,8 @@ import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -18,6 +20,7 @@ import androidx.compose.ui.viewinterop.AndroidView
 import com.fingerly.app.latency.LatencyTestView
 import com.fingerly.app.midi.MidiEngine
 import com.fingerly.core.song.BundledSongs
+import kotlinx.coroutines.flow.StateFlow
 
 enum class Screen { Shell, Checklist, LatencyTest, VirtualPiano, Settings, Highway, Session }
 
@@ -36,6 +39,7 @@ private val DarkScheme: ColorScheme = darkColorScheme(
 fun FingerlyApp(
     engine: MidiEngine,
     currentRefreshRate: () -> Float,
+    relaunchSignal: StateFlow<Int>? = null,
 ) {
     val context = LocalContext.current
     val prefs = remember { context.getSharedPreferences("fingerly", 0) }
@@ -50,6 +54,17 @@ fun FingerlyApp(
     // Sessions teach the beginner starter; free play shows the goal piece.
     val sessionScore = remember { BundledSongs.odeToJoyBeginner() }
     val freePlayScore = remember { BundledSongs.gymnopedie1Excerpt() }
+
+    // Relaunching from the launcher always lands on today's session (SPEC §1),
+    // even if the activity was still alive on another screen.
+    if (relaunchSignal != null) {
+        val relaunches by relaunchSignal.collectAsState()
+        LaunchedEffect(relaunches) {
+            if (relaunches > 0 && prefs.getBoolean("checklist_done", false)) {
+                screen = Screen.Session
+            }
+        }
+    }
 
     MaterialTheme(colorScheme = DarkScheme) {
         Box(Modifier.fillMaxSize().background(Color.Black)) {

@@ -37,7 +37,10 @@ jobs:
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           tag_prefix: v
-          default_bump: false # non-conventional commits -> no tag -> fallback below
+          # Non-feat/fix commits (docs:, ci:, …) bump patch so versions stay
+          # monotonic — a 0.1.<run> fallback after v0.9 reads as a downgrade
+          # to Obtainium.
+          default_bump: patch
 
       - name: Resolve version name
         id: version
