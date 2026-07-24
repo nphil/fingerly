@@ -9,6 +9,7 @@ import android.media.midi.MidiReceiver
 import android.os.Handler
 import android.os.HandlerThread
 import android.os.Process
+import com.fingerly.app.log.RemoteLog
 import com.fingerly.core.midi.MidiEventRing
 import com.fingerly.core.midi.MidiParser
 import java.util.concurrent.Executor
@@ -101,11 +102,13 @@ class MidiEngine(context: Context) {
             openDevice = device
             openPort = port
             connectedInfo = info
-            _connectionState.value = MidiConnectionState(
-                connected = true,
-                deviceName = info.properties.getString(MidiDeviceInfo.PROPERTY_NAME)
-                    ?: info.properties.getString(MidiDeviceInfo.PROPERTY_PRODUCT),
+            val name = info.properties.getString(MidiDeviceInfo.PROPERTY_NAME)
+                ?: info.properties.getString(MidiDeviceInfo.PROPERTY_PRODUCT)
+            RemoteLog.log(
+                "midi",
+                "connected '$name' ports=${info.outputPortCount} id=${info.id}",
             )
+            _connectionState.value = MidiConnectionState(connected = true, deviceName = name)
         }, handler)
     }
 
@@ -180,6 +183,9 @@ class MidiEngine(context: Context) {
             runCatching { port.close() }
         }
         runCatching { openDevice?.close() }
+        if (connectedInfo != null) {
+            RemoteLog.log("midi", "disconnected (dropped events: ${ring.droppedEvents})")
+        }
         openPort = null
         openDevice = null
         connectedInfo = null

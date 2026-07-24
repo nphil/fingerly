@@ -36,6 +36,7 @@ fun ShellScreen(
     onOpenChecklist: () -> Unit,
     onOpenLatencyTest: () -> Unit,
     onOpenVirtualPiano: () -> Unit,
+    onOpenSettings: () -> Unit,
 ) {
     val connection by engine.connectionState.collectAsState()
     var refreshRate by remember { mutableFloatStateOf(currentRefreshRate()) }
@@ -72,6 +73,7 @@ fun ShellScreen(
             )
 
             OutlinedButton(onClick = onOpenChecklist) { Text("Setup checklist") }
+            OutlinedButton(onClick = onOpenSettings) { Text("Settings") }
             OutlinedButton(onClick = onOpenVirtualPiano) { Text("Virtual piano (demo)") }
             // Available in release too: the tablet installs release builds via
             // Obtainium, and the SPEC §7 acceptance gate must be runnable there.

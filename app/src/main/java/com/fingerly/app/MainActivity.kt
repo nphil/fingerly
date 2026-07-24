@@ -1,5 +1,6 @@
 package com.fingerly.app
 
+import android.os.Build
 import android.os.Bundle
 import android.view.WindowManager
 import androidx.activity.ComponentActivity
@@ -8,6 +9,7 @@ import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import com.fingerly.app.display.DisplayModes
+import com.fingerly.app.log.RemoteLog
 import com.fingerly.app.midi.MidiEngine
 import com.fingerly.app.ui.FingerlyApp
 
@@ -23,6 +25,13 @@ class MainActivity : ComponentActivity() {
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         WindowCompat.setDecorFitsSystemWindows(window, false)
 
+        RemoteLog.init(this)
+        RemoteLog.log(
+            "app",
+            "start v${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE}) " +
+                "${Build.MODEL} Android ${Build.VERSION.RELEASE}",
+        )
+
         midiEngine = MidiEngine(this)
         midiEngine.start()
 
@@ -36,8 +45,12 @@ class MainActivity : ComponentActivity() {
 
     override fun onResume() {
         super.onResume()
-        // SPEC §1: hold the 144Hz mode explicitly, every time we come back.
-        DisplayModes.requestHighestRefreshRate(this)
+        // SPEC §1: hold the highest available mode explicitly, every time we come back.
+        val requested = DisplayModes.requestHighestRefreshRate(this)
+        RemoteLog.log(
+            "display",
+            "requested ${requested.toInt()}Hz, now ${DisplayModes.currentRefreshRate(this).toInt()}Hz",
+        )
         hideSystemBars()
     }
 

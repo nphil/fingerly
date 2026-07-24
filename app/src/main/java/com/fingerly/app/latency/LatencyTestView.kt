@@ -8,6 +8,7 @@ import android.graphics.Paint
 import android.graphics.Typeface
 import android.view.Choreographer
 import android.view.View
+import com.fingerly.app.log.RemoteLog
 import com.fingerly.core.latency.LatencyStats
 import com.fingerly.core.midi.MidiEvent
 import com.fingerly.core.midi.MidiEventHandler
@@ -53,6 +54,8 @@ class LatencyTestView(
     private val lineMeta = StringBuilder(64)
 
     private var gatePassed = false
+    private var lastLogNanos = 0L
+    private var loggedSampleCount = 0L
     private var pendingNoteNanos = 0L
     private var pendingNote = -1
     private var flashUntilNanos = 0L
@@ -91,8 +94,30 @@ class LatencyTestView(
             pendingNoteNanos = 0L
             rebuildText(refresh)
         }
+        maybeLogSummary(frameTimeNanos, refresh)
         invalidate()
         Choreographer.getInstance().postFrameCallback(this)
+    }
+
+    /**
+     * Periodic summary for the remote debug log — at most one line per
+     * [LOG_INTERVAL_NANOS], and only when new samples arrived. Never per event:
+     * the hot path must stay allocation- and I/O-free (SPEC §1).
+     */
+    private fun maybeLogSummary(frameTimeNanos: Long, refresh: Float) {
+        if (!RemoteLog.isEnabled()) return
+        if (lastLogNanos == 0L) lastLogNanos = frameTimeNanos
+        if (frameTimeNanos - lastLogNanos < LOG_INTERVAL_NANOS) return
+        lastLogNanos = frameTimeNanos
+        if (stats.totalCount == loggedSampleCount) return
+        loggedSampleCount = stats.totalCount
+        val frameMicros = frameIntervalNanos / 1_000
+        RemoteLog.log(
+            "latency",
+            "n=${stats.totalCount} avg=${stats.avgMicros()}us min=${stats.minMicros()}us " +
+                "max=${stats.maxMicros()}us onscreen_avg=${stats.avgMicros() + frameMicros}us " +
+                "display=${refresh.toInt()}Hz gate=${if (gatePassed) "PASS" else "FAIL"}",
+        )
     }
 
     override fun onDraw(canvas: Canvas) {
@@ -150,6 +175,7 @@ class LatencyTestView(
         private const val FLASH_NANOS = 90_000_000L
         private const val GATE_MICROS = 15_000L
         private const val LINE_H = 64f
+        private const val LOG_INTERVAL_NANOS = 5_000_000_000L
 
         /** Renders micros as "N.NN ms" without any float formatting (no allocation). */
         private fun appendMs(sb: StringBuilder, micros: Long) {

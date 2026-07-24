@@ -18,7 +18,7 @@ import androidx.compose.ui.viewinterop.AndroidView
 import com.fingerly.app.latency.LatencyTestView
 import com.fingerly.app.midi.MidiEngine
 
-enum class Screen { Shell, Checklist, LatencyTest, VirtualPiano }
+enum class Screen { Shell, Checklist, LatencyTest, VirtualPiano, Settings }
 
 private val DarkScheme: ColorScheme = darkColorScheme(
     primary = Color(0xFF00E676),
@@ -53,6 +53,7 @@ fun FingerlyApp(
                     onOpenChecklist = { screen = Screen.Checklist },
                     onOpenLatencyTest = { screen = Screen.LatencyTest },
                     onOpenVirtualPiano = { screen = Screen.VirtualPiano },
+                    onOpenSettings = { screen = Screen.Settings },
                 )
 
                 Screen.Checklist -> ChecklistScreen(
@@ -73,6 +74,8 @@ fun FingerlyApp(
                     engine = engine,
                     onBack = { screen = Screen.Shell },
                 )
+
+                Screen.Settings -> SettingsScreen(onBack = { screen = Screen.Shell })
             }
         }
     }
