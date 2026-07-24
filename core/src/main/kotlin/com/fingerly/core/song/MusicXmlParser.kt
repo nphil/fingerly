@@ -197,11 +197,19 @@ object MusicXmlParser {
 
 /** Bundled songs, shipped as resources inside the :core jar. */
 object BundledSongs {
-    fun gymnopedie1Excerpt(): Score =
+
+    fun gymnopedie1Excerpt(): Score = load("songs/gymnopedie1_excerpt.musicxml")
+
+    /**
+     * The absolute-beginner starter (SPEC §2: hands on keys in minute one):
+     * C-position five-finger melody, stepwise, LH whole-note roots.
+     */
+    fun odeToJoyBeginner(): Score = load("songs/ode_to_joy_beginner.musicxml")
+
+    private fun load(path: String): Score =
         MusicXmlParser.parse(
             requireNotNull(
-                BundledSongs::class.java.classLoader
-                    ?.getResourceAsStream("songs/gymnopedie1_excerpt.musicxml"),
-            ) { "bundled song resource missing" },
+                BundledSongs::class.java.classLoader?.getResourceAsStream(path),
+            ) { "bundled song resource missing: $path" },
         )
 }

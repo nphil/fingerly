@@ -120,6 +120,31 @@ class MusicXmlParserTest {
     }
 
     @Test
+    fun bundledOdeToJoyIsGenuinelyBeginnerSized() {
+        val score = BundledSongs.odeToJoyBeginner()
+        assertEquals(80.0, score.tempoBpm, 1e-9)
+        assertEquals(4, score.beatsPerBar)
+        assertEquals(24.0, score.totalSeconds, 1e-6) // 8 bars @ 3s
+
+        val rh = score.notes.filter { it.hand == ChartNote.HAND_RIGHT }
+        val lh = score.notes.filter { it.hand == ChartNote.HAND_LEFT }
+        assertEquals(30, rh.size)
+        assertEquals(9, lh.size)
+
+        // Melody stays inside the C-position five-finger range (C4..G4)…
+        assertTrue(rh.all { it.midiNote in 60..67 })
+        // …moves stepwise (no interval larger than a 2nd)…
+        rh.zipWithNext().forEach { (a, b) ->
+            assertTrue(Math.abs(b.midiNote - a.midiNote) <= 2)
+        }
+        // …and starts on E4.
+        assertEquals(64, rh.first().midiNote)
+
+        // Left hand: only C3/G2 roots, one note at a time.
+        assertTrue(lh.all { it.midiNote == 48 || it.midiNote == 43 })
+    }
+
+    @Test
     fun bundledGymnopedieExcerptParses() {
         val score = BundledSongs.gymnopedie1Excerpt()
         assertTrue(score.title.startsWith("Gymnopédie No. 1"))

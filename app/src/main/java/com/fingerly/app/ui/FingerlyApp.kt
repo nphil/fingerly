@@ -46,8 +46,10 @@ fun FingerlyApp(
             if (prefs.getBoolean("checklist_done", false)) Screen.Session else Screen.Checklist,
         )
     }
-    // Parses in ~ms from a bundled resource; fine at first composition.
-    val score = remember { BundledSongs.gymnopedie1Excerpt() }
+    // Parse in ~ms from bundled resources; fine at first composition.
+    // Sessions teach the beginner starter; free play shows the goal piece.
+    val sessionScore = remember { BundledSongs.odeToJoyBeginner() }
+    val freePlayScore = remember { BundledSongs.gymnopedie1Excerpt() }
 
     MaterialTheme(colorScheme = DarkScheme) {
         Box(Modifier.fillMaxSize().background(Color.Black)) {
@@ -61,7 +63,7 @@ fun FingerlyApp(
                     onOpenSettings = { screen = Screen.Settings },
                     onOpenHighway = { screen = Screen.Highway },
                     onOpenSession = { screen = Screen.Session },
-                    songTitle = score.title,
+                    songTitle = freePlayScore.title,
                 )
 
                 Screen.Checklist -> ChecklistScreen(
@@ -87,13 +89,13 @@ fun FingerlyApp(
 
                 Screen.Highway -> HighwayScreen(
                     engine = engine,
-                    score = score,
+                    score = freePlayScore,
                     onBack = { screen = Screen.Shell },
                 )
 
                 Screen.Session -> SessionScreen(
                     engine = engine,
-                    score = score,
+                    score = sessionScore,
                     onExit = { screen = Screen.Shell },
                 )
             }

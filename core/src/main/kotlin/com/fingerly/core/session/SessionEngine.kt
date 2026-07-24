@@ -206,10 +206,12 @@ class SessionEngine(
         setLadderFor(
             target,
             if (pr.attempts == 0) {
-                AutoDifficulty.FRESH_START_INDEX
+                // Fresh material starts at the very easiest rung: guaranteed
+                // early success, the ladder climbs from there (SPEC §2.1/§3).
+                Int.MAX_VALUE // coerced to the ladder bottom
             } else {
                 // Resume just below the best clean rung; struggle data decides from there.
-                (pr.bestCleanIndex.coerceAtMost(AutoDifficulty.FRESH_START_INDEX))
+                pr.bestCleanIndex.coerceAtMost(AutoDifficulty.FRESH_START_INDEX)
             },
         )
     }

@@ -23,6 +23,7 @@ class SessionRepository(private val db: FingerlyDatabase) {
     suspend fun ensureSong(
         score: Score,
         filePath: String,
+        composer: String,
         difficultyRank: Int,
         passages: List<Passage>,
     ): Map<Int, Long> = withContext(Dispatchers.IO) {
@@ -30,7 +31,7 @@ class SessionRepository(private val db: FingerlyDatabase) {
         val songId = existing?.id ?: db.songDao().insert(
             SongEntity(
                 title = score.title,
-                composer = "Erik Satie",
+                composer = composer,
                 sourceFormat = "musicxml",
                 filePath = filePath,
                 difficultyRank = difficultyRank,

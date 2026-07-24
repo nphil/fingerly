@@ -66,7 +66,9 @@ fun SessionScreen(engine: MidiEngine, score: Score, onExit: () -> Unit) {
     var sessionId by remember { mutableStateOf(0L) }
 
     LaunchedEffect(Unit) {
-        val map = repo.ensureSong(score, "bundled:gymnopedie1_excerpt", 1, passages)
+        val map = repo.ensureSong(
+            score, "bundled:ode_to_joy_beginner", "Ludwig van Beethoven", 0, passages,
+        )
         val progress = repo.loadProgress(map)
         val se = SessionEngine(passages, progress, nowMs = { System.currentTimeMillis() })
         idMap = map
