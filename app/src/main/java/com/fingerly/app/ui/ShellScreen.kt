@@ -36,6 +36,7 @@ fun ShellScreen(
     currentRefreshRate: () -> Float,
     onOpenChecklist: () -> Unit,
     onOpenLatencyTest: () -> Unit,
+    onOpenVirtualPiano: () -> Unit,
 ) {
     val connection by engine.connectionState.collectAsState()
     var refreshRate by remember { mutableFloatStateOf(currentRefreshRate()) }
@@ -72,6 +73,7 @@ fun ShellScreen(
             )
 
             OutlinedButton(onClick = onOpenChecklist) { Text("Setup checklist") }
+            OutlinedButton(onClick = onOpenVirtualPiano) { Text("Virtual piano (demo)") }
             if (BuildConfig.DEBUG) {
                 Button(onClick = onOpenLatencyTest) { Text("Latency test") }
             }

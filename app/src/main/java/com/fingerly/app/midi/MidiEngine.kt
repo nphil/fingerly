@@ -108,6 +108,54 @@ class MidiEngine(context: Context) {
         }, handler)
     }
 
+    /**
+     * Demo mode: inject a synthetic event. Posted to the MIDI thread so the ring's
+     * single-producer invariant holds even while a real device is streaming.
+     * Not a hot path — allocation here is fine.
+     */
+    fun injectVirtual(type: Int, note: Int, velocity: Int) {
+        handler.post {
+            val e = ring.tryClaim() ?: return@post
+            e.set(type, 0, note, velocity, System.nanoTime())
+            ring.publish()
+        }
+    }
+
+    private val _demoPlaying = MutableStateFlow(false)
+    val demoPlaying: StateFlow<Boolean> = _demoPlaying
+
+    private var demoStep = 0
+    private val demoLoop = object : Runnable {
+        override fun run() {
+            if (!_demoPlaying.value) return
+            val note = DEMO_SEQUENCE[demoStep % DEMO_SEQUENCE.size]
+            val e1 = ring.tryClaim()
+            if (e1 != null) {
+                e1.set(com.fingerly.core.midi.MidiEvent.TYPE_NOTE_ON, 0, note, 96, System.nanoTime())
+                ring.publish()
+            }
+            handler.postDelayed({
+                val e2 = ring.tryClaim()
+                if (e2 != null) {
+                    e2.set(com.fingerly.core.midi.MidiEvent.TYPE_NOTE_OFF, 0, note, 0, System.nanoTime())
+                    ring.publish()
+                }
+            }, DEMO_NOTE_MS / 2)
+            demoStep++
+            handler.postDelayed(this, DEMO_NOTE_MS)
+        }
+    }
+
+    /** Demo mode: loop a C-major arpeggio through the pipeline, as if played live. */
+    fun setDemoPlaying(playing: Boolean) {
+        if (_demoPlaying.value == playing) return
+        _demoPlaying.value = playing
+        if (playing) {
+            demoStep = 0
+            handler.post(demoLoop)
+        }
+    }
+
     private fun disconnect() {
         openPort?.let { port ->
             runCatching { port.disconnect(receiver) }
@@ -118,5 +166,10 @@ class MidiEngine(context: Context) {
         openDevice = null
         connectedInfo = null
         _connectionState.value = MidiConnectionState()
+    }
+
+    companion object {
+        private val DEMO_SEQUENCE = intArrayOf(60, 64, 67, 72, 67, 64) // C E G C G E
+        private const val DEMO_NOTE_MS = 400L
     }
 }
