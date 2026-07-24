@@ -76,6 +76,9 @@ class NoteHighwayView(
     private var whiteKeyWidth = 0f
     private val pressed = BooleanArray(128)
 
+    /** Per-frame key guidance: 0 none, 1 right-hand note due now, 2 left-hand. */
+    private val keyDue = IntArray(128)
+
     // --- notes draw state ---
     private var drawFrom = 0
     private val noteRect = RectF()
@@ -114,6 +117,14 @@ class NoteHighwayView(
     private val hitNotePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.rgb(245, 245, 240) }
     private val missNotePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.rgb(120, 40, 40) }
     private val particlePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.rgb(0, 230, 118) }
+    private val dueRightPaint = Paint().apply { color = Color.rgb(0, 145, 75) }
+    private val dueLeftPaint = Paint().apply { color = Color.rgb(36, 118, 158) }
+    private val labelPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.rgb(90, 100, 110)
+        textSize = 24f
+        typeface = Typeface.MONOSPACE
+    }
+    private val middleCPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.rgb(0, 230, 118) }
     private val hudPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = Color.rgb(200, 210, 215)
         textSize = 34f
@@ -211,15 +222,11 @@ class NoteHighwayView(
         super.onSizeChanged(w, h, oldw, oldh)
         keyboardTop = h * (1f - KEYBOARD_FRACTION)
 
-        var min = 127
-        var max = 0
-        for (n in notes) {
-            if (n.midiNote < min) min = n.midiNote
-            if (n.midiNote > max) max = n.midiNote
-        }
-        if (min > max) { min = 60; max = 72 }
-        lowNote = whiteKeyAtOrBelow(min - 2)
-        highNote = whiteKeyAtOrAbove(max + 2)
+        // Always the full 88 keys (A0–C8): the on-screen keyboard mirrors the
+        // physical piano 1:1, so a pressed key lights up in the matching spot
+        // and positions transfer directly (SPEC §2.5: exact, verifiable).
+        lowNote = 21
+        highNote = 108
 
         var whiteCount = 0
         for (n in lowNote..highNote) if (!isBlack(n)) whiteCount++
@@ -318,6 +325,7 @@ class NoteHighwayView(
     private fun drawNotes(canvas: Canvas) {
         val pps = keyboardTop / (LOOKAHEAD_MS / 1000f) // pixels per second
         val nowSec = songMs / 1000f
+        java.util.Arrays.fill(keyDue, 0)
         // Skip fully-consumed notes permanently.
         while (drawFrom < notes.size &&
             (notes[drawFrom].startSeconds + notes[drawFrom].durationSeconds) * 1000 < songMs - 200
@@ -330,6 +338,10 @@ class NoteHighwayView(
             val startIn = n.startSeconds.toFloat() - nowSec
             if (startIn * 1000 > LOOKAHEAD_MS) break
             val endIn = startIn + n.durationSeconds.toFloat()
+            // Key guidance: a pending note at/crossing the hit line lights its key.
+            if (judge.stateOf(i) == HitJudge.STATE_PENDING && startIn <= 0.05f && endIn > 0f) {
+                keyDue[n.midiNote] = n.hand + 1
+            }
             var top = keyboardTop - endIn * pps
             var bottom = keyboardTop - startIn * pps
             if (bottom > keyboardTop) bottom = keyboardTop
@@ -355,7 +367,7 @@ class NoteHighwayView(
             if (isBlack(n)) continue
             val half = whiteKeyWidth / 2f - 1f
             noteRect.set(noteX[n] - half, keyboardTop + 2f, noteX[n] + half, h)
-            canvas.drawRect(noteRect, if (pressed[n]) pressedPaint else whiteKeyPaint)
+            canvas.drawRect(noteRect, whiteKeyPaintFor(n))
         }
         // Black keys on top, upper 60% of keyboard height.
         val blackBottom = keyboardTop + (h - keyboardTop) * 0.62f
@@ -363,8 +375,34 @@ class NoteHighwayView(
             if (!isBlack(n)) continue
             val half = noteW[n] / 2f
             noteRect.set(noteX[n] - half, keyboardTop + 2f, noteX[n] + half, blackBottom)
-            canvas.drawRect(noteRect, if (pressed[n]) pressedPaint else blackKeyPaint)
+            canvas.drawRect(noteRect, blackKeyPaintFor(n))
         }
+        // Octave labels on every C, mirroring how you find your place on the
+        // real keyboard; middle C additionally marked (beginner anchor).
+        val labelY = h - 10f
+        for (octave in 1..8) {
+            val n = octave * 12 + 12 // C1=24 … C8=108
+            if (n < lowNote || n > highNote) continue
+            val label = C_LABELS[octave - 1]
+            canvas.drawText(label, noteX[n] - labelPaint.measureText(label) / 2f, labelY, labelPaint)
+            if (n == 60) { // middle C
+                canvas.drawCircle(noteX[n], labelY - 34f, 7f, middleCPaint)
+            }
+        }
+    }
+
+    private fun whiteKeyPaintFor(n: Int): Paint = when {
+        pressed[n] -> pressedPaint
+        keyDue[n] == 1 -> dueRightPaint
+        keyDue[n] == 2 -> dueLeftPaint
+        else -> whiteKeyPaint
+    }
+
+    private fun blackKeyPaintFor(n: Int): Paint = when {
+        pressed[n] -> pressedPaint
+        keyDue[n] == 1 -> dueRightPaint
+        keyDue[n] == 2 -> dueLeftPaint
+        else -> blackKeyPaint
     }
 
     // ------------------------------------------------------------------ particles
@@ -484,18 +522,6 @@ class NoteHighwayView(
         else -> false
     }
 
-    private fun whiteKeyAtOrBelow(note: Int): Int {
-        var n = note.coerceIn(0, 127)
-        while (isBlack(n)) n--
-        return n
-    }
-
-    private fun whiteKeyAtOrAbove(note: Int): Int {
-        var n = note.coerceIn(0, 127)
-        while (isBlack(n)) n++
-        return n
-    }
-
     companion object {
         private const val LEAD_IN_MS = 3000L
         private const val END_GRACE_MS = 1500L
@@ -507,5 +533,6 @@ class NoteHighwayView(
         private const val GRAVITY = 1500f
         private const val AUTOPLAY_VELOCITY = 80
         private const val WARMUP_FRAMES = 12 // ~100ms @120Hz
+        private val C_LABELS = arrayOf("C1", "C2", "C3", "C4", "C5", "C6", "C7", "C8")
     }
 }
