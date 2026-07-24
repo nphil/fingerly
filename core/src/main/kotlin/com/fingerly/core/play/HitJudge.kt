@@ -25,6 +25,7 @@ class HitJudge(
     val noteCount = notes.size
     private val startMs = LongArray(noteCount)
     private val pitch = IntArray(noteCount)
+    private val hand = IntArray(noteCount)
     private val state = IntArray(noteCount) // PENDING / HIT / MISSED
     private val errMs = LongArray(noteCount) // signed timing error for hits (+ = late)
 
@@ -36,12 +37,16 @@ class HitJudge(
     var combo = 0; private set
     var bestCombo = 0; private set
     private var sumAbsErrMs = 0L
+    private var sumSignedErrMs = 0L
+    private val handHits = IntArray(2)
+    private val handMisses = IntArray(2)
 
     init {
         // Chart is pre-sorted by start; copy into flat arrays.
         for (i in notes.indices) {
             startMs[i] = (notes[i].startSeconds * 1000).toLong()
             pitch[i] = notes[i].midiNote
+            hand[i] = notes[i].hand
         }
     }
 
@@ -50,6 +55,9 @@ class HitJudge(
         scanFrom = 0
         hits = 0; misses = 0; extras = 0; combo = 0; bestCombo = 0
         sumAbsErrMs = 0
+        sumSignedErrMs = 0
+        handHits.fill(0)
+        handMisses.fill(0)
     }
 
     /** State of chart note [i]: [STATE_PENDING], [STATE_HIT] or [STATE_MISSED]. */
@@ -78,6 +86,8 @@ class HitJudge(
         state[best] = STATE_HIT
         errMs[best] = songMs - startMs[best]
         sumAbsErrMs += bestAbs
+        sumSignedErrMs += songMs - startMs[best]
+        handHits[hand[best]]++
         hits++
         combo++
         if (combo > bestCombo) bestCombo = combo
@@ -90,6 +100,7 @@ class HitJudge(
         while (i < noteCount && startMs[i] + missAfterMs < songMs) {
             if (state[i] == STATE_PENDING) {
                 state[i] = STATE_MISSED
+                handMisses[hand[i]]++
                 misses++
                 combo = 0
             }
@@ -107,6 +118,16 @@ class HitJudge(
 
     /** Mean absolute timing error of hits, in ms. */
     fun avgAbsErrorMs(): Long = if (hits == 0) 0 else sumAbsErrMs / hits
+
+    /** Mean signed timing error of hits (+ = late, - = early), in ms. */
+    fun meanSignedErrorMs(): Long = if (hits == 0) 0 else sumSignedErrMs / hits
+
+    /** Hit rate of one hand (0–100), or -1 if the chart had no notes for it. */
+    fun handAccuracyPercent(h: Int): Float {
+        val total = handHits[h] + handMisses[h]
+        if (total == 0) return -1f
+        return handHits[h] * 100f / total
+    }
 
     /** Signed timing error of hit note [i] (+ = late). Valid only when hit. */
     fun errorMsOf(i: Int): Long = errMs[i]

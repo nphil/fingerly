@@ -15,7 +15,7 @@ import androidx.room.RoomDatabase
         SrsCardEntity::class,
         AppSettingEntity::class,
     ],
-    version = 1,
+    version = 2,
     exportSchema = true,
 )
 abstract class FingerlyDatabase : RoomDatabase() {
@@ -37,7 +37,11 @@ abstract class FingerlyDatabase : RoomDatabase() {
                     context.applicationContext,
                     FingerlyDatabase::class.java,
                     "fingerly.db",
-                ).build().also { instance = it }
+                )
+                    // Single-user app, pre-1.0: schema changes may drop local data.
+                    // Proper migrations start once real practice history exists.
+                    .fallbackToDestructiveMigration()
+                    .build().also { instance = it }
             }
     }
 }

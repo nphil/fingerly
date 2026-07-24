@@ -16,6 +16,9 @@ interface SongDao {
 
     @Query("SELECT * FROM songs WHERE id = :id")
     suspend fun byId(id: Long): SongEntity?
+
+    @Query("SELECT * FROM songs WHERE filePath = :filePath LIMIT 1")
+    suspend fun byFilePath(filePath: String): SongEntity?
 }
 
 @Dao
@@ -64,6 +67,9 @@ interface SrsCardDao {
 
     @Query("SELECT * FROM srs_cards WHERE dueAtEpochMs <= :nowEpochMs ORDER BY dueAtEpochMs")
     suspend fun due(nowEpochMs: Long): List<SrsCardEntity>
+
+    @Query("SELECT * FROM srs_cards WHERE passageId = :passageId LIMIT 1")
+    suspend fun forPassage(passageId: Long): SrsCardEntity?
 }
 
 @Dao

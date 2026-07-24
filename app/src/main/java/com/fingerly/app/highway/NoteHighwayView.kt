@@ -52,6 +52,15 @@ class NoteHighwayView(
     private val autoOffSent = BooleanArray(notes.size)
     private var autoFrom = 0
 
+    /** Session mode: called once when the run completes; flow is external then. */
+    var onEnded: ((HitJudge) -> Unit)? = null
+
+    /** Free-play lets a tap restart the run; session mode drives flow itself. */
+    var tapToRestart = true
+
+    /** Shorter for micro-passages so reps stay tight. */
+    var leadInMs = LEAD_IN_MS
+
     // --- clock ---
     private var anchorNanos = 0L
     private var songMs = -LEAD_IN_MS
@@ -155,10 +164,14 @@ class NoteHighwayView(
         super.onDetachedFromWindow()
     }
 
+    private val discardHandler = MidiEventHandler { }
+
     fun restart() {
+        // Events queued while no run was active must not be judged as extras.
+        ring.drain(discardHandler)
         judge.reset()
         anchorNanos = System.nanoTime()
-        songMs = -LEAD_IN_MS
+        songMs = -leadInMs
         ended = false
         drawFrom = 0
         particleCount = 0
@@ -249,7 +262,7 @@ class NoteHighwayView(
         }
         lastFrameNanos = frameTimeNanos
 
-        songMs = (frameTimeNanos - anchorNanos) / 1_000_000 - LEAD_IN_MS
+        songMs = (frameTimeNanos - anchorNanos) / 1_000_000 - leadInMs
         if (autoplay && !ended) pumpAutoplay()
         ring.drain(drainHandler)
         if (!ended) {
@@ -258,6 +271,7 @@ class NoteHighwayView(
                 ended = true
                 rebuildEndText()
                 logSummary(force = true)
+                onEnded?.invoke(judge)
             }
         }
 
@@ -451,7 +465,7 @@ class NoteHighwayView(
     }
 
     override fun onTouchEvent(event: MotionEvent): Boolean {
-        if (event.actionMasked == MotionEvent.ACTION_DOWN && ended) {
+        if (event.actionMasked == MotionEvent.ACTION_DOWN && ended && tapToRestart) {
             restart()
             return true
         }

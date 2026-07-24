@@ -82,9 +82,20 @@ data class PassageAttemptEntity(
     val passageId: Long,
     val startedAtEpochMs: Long,
     val tempoBpm: Int,
+    /** Auto-difficulty tempo scale in effect, 1.0 = full speed (SPEC §3). */
+    val tempoMultiplier: Float,
     val accuracyPercent: Float,
     val notesHit: Int,
     val notesMissed: Int,
+    /** Wrong/extra notes played — they count against accuracy (SPEC §2.8). */
+    val notesExtra: Int,
+    /** Mean absolute timing error of hits, ms. */
+    val avgAbsErrorMs: Long,
+    /** Mean signed timing error (+ = late), ms — the rushing/dragging signal. */
+    val meanSignedErrorMs: Long,
+    /** Per-hand hit rate, -1 when the run had no notes for that hand. */
+    val leftHandAccuracy: Float,
+    val rightHandAccuracy: Float,
     /** "LEFT", "RIGHT" or "BOTH" — hands may be split by auto-difficulty (SPEC §3). */
     val handMode: String,
 )

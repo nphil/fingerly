@@ -19,7 +19,7 @@ import com.fingerly.app.latency.LatencyTestView
 import com.fingerly.app.midi.MidiEngine
 import com.fingerly.core.song.BundledSongs
 
-enum class Screen { Shell, Checklist, LatencyTest, VirtualPiano, Settings, Highway }
+enum class Screen { Shell, Checklist, LatencyTest, VirtualPiano, Settings, Highway, Session }
 
 private val DarkScheme: ColorScheme = darkColorScheme(
     primary = Color(0xFF00E676),
@@ -41,7 +41,9 @@ fun FingerlyApp(
     val prefs = remember { context.getSharedPreferences("fingerly", 0) }
     var screen by remember {
         mutableStateOf(
-            if (prefs.getBoolean("checklist_done", false)) Screen.Shell else Screen.Checklist,
+            // SPEC §1: the app opens directly into today's session — no menu
+            // navigation to start. First run goes through the checklist once.
+            if (prefs.getBoolean("checklist_done", false)) Screen.Session else Screen.Checklist,
         )
     }
     // Parses in ~ms from a bundled resource; fine at first composition.
@@ -58,6 +60,7 @@ fun FingerlyApp(
                     onOpenVirtualPiano = { screen = Screen.VirtualPiano },
                     onOpenSettings = { screen = Screen.Settings },
                     onOpenHighway = { screen = Screen.Highway },
+                    onOpenSession = { screen = Screen.Session },
                     songTitle = score.title,
                 )
 
@@ -66,7 +69,7 @@ fun FingerlyApp(
                     currentRefreshRate = currentRefreshRate,
                     onDone = {
                         prefs.edit().putBoolean("checklist_done", true).apply()
-                        screen = Screen.Shell
+                        screen = Screen.Session
                     },
                 )
 
@@ -86,6 +89,12 @@ fun FingerlyApp(
                     engine = engine,
                     score = score,
                     onBack = { screen = Screen.Shell },
+                )
+
+                Screen.Session -> SessionScreen(
+                    engine = engine,
+                    score = score,
+                    onExit = { screen = Screen.Shell },
                 )
             }
         }
