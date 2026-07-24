@@ -217,7 +217,8 @@ private fun BriefingContent(
                 Text(diagnostic, color = Color(0xFF78828C))
             }
             Text(
-                "Press the key when it lights up. Tap or hold — only the press is graded.",
+                "Press the key when it lights up; tap or hold, only the press is graded. " +
+                    "To find any C on your piano: the white key just left of each PAIR of black keys.",
                 color = Color(0xFF78828C),
                 style = MaterialTheme.typography.bodyMedium,
             )

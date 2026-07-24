@@ -85,6 +85,14 @@ class NoteHighwayView(
     /** Red = wrong key, and nothing else: flash deadline per key (nanos). */
     private val wrongKeyUntil = LongArray(128)
 
+    // Match-by-letter aids: pre-built labels (no per-frame allocation) and the
+    // passage's active key range (everything else drawn dimmed).
+    private val noteLabels = Array(128) { midi ->
+        "${LETTERS[midi % 12]}${midi / 12 - 1}"
+    }
+    private var rangeLow = 0
+    private var rangeHigh = 127
+
     // --- notes draw state ---
     private var drawFrom = 0
     private val noteRect = RectF()
@@ -133,6 +141,20 @@ class NoteHighwayView(
         typeface = Typeface.MONOSPACE
     }
     private val middleCPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.rgb(0, 230, 118) }
+    private val dimWhiteKeyPaint = Paint().apply { color = Color.rgb(150, 152, 150) }
+    private val dimBlackKeyPaint = Paint().apply { color = Color.rgb(14, 18, 22) }
+    private val keyLetterPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.rgb(20, 26, 32)
+        textSize = 26f
+        typeface = Typeface.MONOSPACE
+        isFakeBoldText = true
+    }
+    private val noteLabelPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.rgb(6, 10, 14)
+        textSize = 28f
+        typeface = Typeface.MONOSPACE
+        isFakeBoldText = true
+    }
     private val hudPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = Color.rgb(200, 210, 215)
         textSize = 34f
@@ -240,6 +262,8 @@ class NoteHighwayView(
         // and positions transfer directly (SPEC §2.5: exact, verifiable).
         lowNote = 21
         highNote = 108
+        rangeLow = notes.minOfOrNull { it.midiNote } ?: 0
+        rangeHigh = notes.maxOfOrNull { it.midiNote } ?: 127
 
         var whiteCount = 0
         for (n in lowNote..highNote) if (!isBlack(n)) whiteCount++
@@ -368,6 +392,16 @@ class NoteHighwayView(
                 val half = noteW[n.midiNote] / 2f
                 noteRect.set(noteX[n.midiNote] - half, top, noteX[n.midiNote] + half, bottom)
                 canvas.drawRoundRect(noteRect, 8f, 8f, paint)
+                // Note name on the note itself: match by letter, not position.
+                if (bottom - top > 44f) {
+                    val label = noteLabels[n.midiNote]
+                    canvas.drawText(
+                        label,
+                        noteX[n.midiNote] - noteLabelPaint.measureText(label) / 2f,
+                        bottom - 14f,
+                        noteLabelPaint,
+                    )
+                }
             }
             i++
         }
@@ -375,7 +409,8 @@ class NoteHighwayView(
 
     private fun drawKeyboard(canvas: Canvas) {
         val h = height.toFloat()
-        // White keys first.
+        // White keys first; keys outside the passage's range are dimmed so the
+        // active zone pops out of the 88-key strip.
         for (n in lowNote..highNote) {
             if (isBlack(n)) continue
             val half = whiteKeyWidth / 2f - 1f
@@ -390,17 +425,15 @@ class NoteHighwayView(
             noteRect.set(noteX[n] - half, keyboardTop + 2f, noteX[n] + half, blackBottom)
             canvas.drawRect(noteRect, blackKeyPaintFor(n))
         }
-        // Octave labels on every C, mirroring how you find your place on the
-        // real keyboard; middle C additionally marked (beginner anchor).
+        // Letter on every white key; octave number on Cs; middle C marked.
         val labelY = h - 10f
-        for (octave in 1..8) {
-            val n = octave * 12 + 12 // C1=24 … C8=108
-            if (n < lowNote || n > highNote) continue
-            val label = C_LABELS[octave - 1]
-            canvas.drawText(label, noteX[n] - labelPaint.measureText(label) / 2f, labelY, labelPaint)
-            if (n == 60) { // middle C
-                canvas.drawCircle(noteX[n], labelY - 34f, 7f, middleCPaint)
-            }
+        for (n in lowNote..highNote) {
+            if (isBlack(n)) continue
+            val isC = n % 12 == 0
+            val label = if (isC) noteLabels[n] else LETTERS[n % 12]
+            val paint = if (n in rangeLow..rangeHigh) keyLetterPaint else labelPaint
+            canvas.drawText(label, noteX[n] - paint.measureText(label) / 2f, labelY, paint)
+            if (n == 60) canvas.drawCircle(noteX[n], labelY - 34f, 7f, middleCPaint)
         }
     }
 
@@ -409,6 +442,7 @@ class NoteHighwayView(
         pressed[n] -> pressedPaint
         keyDue[n] == 1 -> dueRightPaint
         keyDue[n] == 2 -> dueLeftPaint
+        n !in rangeLow..rangeHigh -> dimWhiteKeyPaint
         else -> whiteKeyPaint
     }
 
@@ -417,6 +451,7 @@ class NoteHighwayView(
         pressed[n] -> pressedPaint
         keyDue[n] == 1 -> dueRightPaint
         keyDue[n] == 2 -> dueLeftPaint
+        n !in rangeLow..rangeHigh -> dimBlackKeyPaint
         else -> blackKeyPaint
     }
 
@@ -549,6 +584,7 @@ class NoteHighwayView(
         private const val AUTOPLAY_VELOCITY = 80
         private const val WARMUP_FRAMES = 12 // ~100ms @120Hz
         private const val WRONG_FLASH_NANOS = 450_000_000L
-        private val C_LABELS = arrayOf("C1", "C2", "C3", "C4", "C5", "C6", "C7", "C8")
+        private val LETTERS =
+            arrayOf("C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B")
     }
 }
