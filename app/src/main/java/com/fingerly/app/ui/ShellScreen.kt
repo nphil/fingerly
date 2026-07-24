@@ -37,6 +37,8 @@ fun ShellScreen(
     onOpenLatencyTest: () -> Unit,
     onOpenVirtualPiano: () -> Unit,
     onOpenSettings: () -> Unit,
+    onOpenHighway: () -> Unit,
+    songTitle: String,
 ) {
     val connection by engine.connectionState.collectAsState()
     var refreshRate by remember { mutableFloatStateOf(currentRefreshRate()) }
@@ -72,6 +74,7 @@ fun ShellScreen(
                 },
             )
 
+            Button(onClick = onOpenHighway) { Text("Play: $songTitle") }
             OutlinedButton(onClick = onOpenChecklist) { Text("Setup checklist") }
             OutlinedButton(onClick = onOpenSettings) { Text("Settings") }
             OutlinedButton(onClick = onOpenVirtualPiano) { Text("Virtual piano (demo)") }

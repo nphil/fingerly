@@ -17,8 +17,9 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.viewinterop.AndroidView
 import com.fingerly.app.latency.LatencyTestView
 import com.fingerly.app.midi.MidiEngine
+import com.fingerly.core.song.BundledSongs
 
-enum class Screen { Shell, Checklist, LatencyTest, VirtualPiano, Settings }
+enum class Screen { Shell, Checklist, LatencyTest, VirtualPiano, Settings, Highway }
 
 private val DarkScheme: ColorScheme = darkColorScheme(
     primary = Color(0xFF00E676),
@@ -43,6 +44,8 @@ fun FingerlyApp(
             if (prefs.getBoolean("checklist_done", false)) Screen.Shell else Screen.Checklist,
         )
     }
+    // Parses in ~ms from a bundled resource; fine at first composition.
+    val score = remember { BundledSongs.gymnopedie1Excerpt() }
 
     MaterialTheme(colorScheme = DarkScheme) {
         Box(Modifier.fillMaxSize().background(Color.Black)) {
@@ -54,6 +57,8 @@ fun FingerlyApp(
                     onOpenLatencyTest = { screen = Screen.LatencyTest },
                     onOpenVirtualPiano = { screen = Screen.VirtualPiano },
                     onOpenSettings = { screen = Screen.Settings },
+                    onOpenHighway = { screen = Screen.Highway },
+                    songTitle = score.title,
                 )
 
                 Screen.Checklist -> ChecklistScreen(
@@ -76,6 +81,12 @@ fun FingerlyApp(
                 )
 
                 Screen.Settings -> SettingsScreen(onBack = { screen = Screen.Shell })
+
+                Screen.Highway -> HighwayScreen(
+                    engine = engine,
+                    score = score,
+                    onBack = { screen = Screen.Shell },
+                )
             }
         }
     }
