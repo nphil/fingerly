@@ -35,10 +35,13 @@ Trunk-based: every push to `main` triggers `.github/workflows/android.yml`, whic
 3. assembles a release APK, and
 4. attaches it to an auto-created GitHub Release.
 
-**To install on the tablet:** open this repo's **Releases** page in the tablet's
-browser → download the APK from the latest release → open it → allow
-"install unknown apps" for the browser when prompted. Repeat per release; Android
-updates in place as long as the signing key is unchanged.
+**To install on the tablet:** the recommended way is
+[Obtainium](https://github.com/ImranR98/Obtainium) — add an app with the source URL
+`https://github.com/nphil/fingerly` and it will install the APK from the latest
+Release and notify on every new one. Manual alternative: open this repo's
+**Releases** page in the tablet's browser → download the APK → open it → allow
+"install unknown apps" when prompted. Android updates in place as long as the
+signing key is unchanged.
 
 ### Release signing secrets
 

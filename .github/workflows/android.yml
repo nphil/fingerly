@@ -64,16 +64,21 @@ jobs:
           -PversionCode=${{ github.run_number }}
           -PversionName=${{ steps.version.outputs.name }}
 
+      # Stable "fingerly-vX.Y.Z.apk" naming — Obtainium and humans both prefer it
+      # over the default app-release.apk.
+      - name: Name APK
+        run: mv app/build/outputs/apk/release/*.apk fingerly-v${{ steps.version.outputs.name }}.apk
+
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: keyquest-${{ steps.version.outputs.name }}
-          path: app/build/outputs/apk/release/*.apk
+          name: fingerly-${{ steps.version.outputs.name }}
+          path: fingerly-v*.apk
 
       - name: Create GitHub Release with APK
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.version.outputs.tag }}
-          name: KeyQuest ${{ steps.version.outputs.name }}
+          name: Fingerly ${{ steps.version.outputs.name }}
           generate_release_notes: true # commits since last release as changelog
-          files: app/build/outputs/apk/release/*.apk
+          files: fingerly-v*.apk
