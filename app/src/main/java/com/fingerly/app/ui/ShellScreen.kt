@@ -22,7 +22,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
-import com.fingerly.app.BuildConfig
 import com.fingerly.app.midi.MidiEngine
 import kotlinx.coroutines.delay
 
@@ -74,9 +73,9 @@ fun ShellScreen(
 
             OutlinedButton(onClick = onOpenChecklist) { Text("Setup checklist") }
             OutlinedButton(onClick = onOpenVirtualPiano) { Text("Virtual piano (demo)") }
-            if (BuildConfig.DEBUG) {
-                Button(onClick = onOpenLatencyTest) { Text("Latency test") }
-            }
+            // Available in release too: the tablet installs release builds via
+            // Obtainium, and the SPEC §7 acceptance gate must be runnable there.
+            Button(onClick = onOpenLatencyTest) { Text("Latency test") }
         }
     }
 }

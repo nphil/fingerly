@@ -15,7 +15,8 @@ tested), `:app` = Android.
 
 ## Performance rules (SPEC §1 — non-negotiable)
 - Hold 144Hz explicitly via `preferredDisplayModeId`; never assume the OS picked it.
-- Keypress → visual response < 15ms. Latency test screen ships in debug builds.
+- Keypress → visual response < 15ms. Latency test screen ships in-app (release too —
+  the tablet installs release builds via Obtainium).
 - Zero-allocation hot path: pre-allocated pools + lock-free SPSC queue. Any per-frame
   allocation in the render loop or MIDI pipeline is a bug.
 - MIDI is parsed on its delivery thread and never touches the UI thread.
