@@ -41,6 +41,11 @@ object AutoDifficulty {
             PracticeSetting(0.55, weakerHand, all),
             PracticeSetting(0.55, strongerHand, half),
             PracticeSetting(0.55, weakerHand, half),
+            // Wait-mode rungs: key-finding before any timing pressure. The
+            // song pauses at each note until the right key is pressed.
+            PracticeSetting(0.7, strongerHand, all, wait = true),
+            PracticeSetting(0.7, weakerHand, all, wait = true),
+            PracticeSetting(0.7, weakerHand, half, wait = true),
         )
     }
 

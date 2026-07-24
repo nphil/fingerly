@@ -205,13 +205,14 @@ class SessionEngine(
         val pr = progressOf(target)
         setLadderFor(
             target,
-            if (pr.attempts == 0) {
-                // Fresh material starts at the very easiest rung: guaranteed
-                // early success, the ladder climbs from there (SPEC §2.1/§3).
-                Int.MAX_VALUE // coerced to the ladder bottom
-            } else {
-                // Resume just below the best clean rung; struggle data decides from there.
-                pr.bestCleanIndex.coerceAtMost(AutoDifficulty.FRESH_START_INDEX)
+            when {
+                // Fresh or never-clean material sits at the very easiest rung:
+                // guaranteed early success, the ladder climbs from there
+                // (SPEC §2.1/§3). MAX_VALUE is coerced to the ladder bottom.
+                pr.attempts == 0 || pr.bestCleanIndex == Int.MAX_VALUE -> Int.MAX_VALUE
+                // Otherwise exactly one rung harder than the best clean pass —
+                // never a jump.
+                else -> pr.bestCleanIndex - 1
             },
         )
     }
@@ -255,7 +256,7 @@ class SessionEngine(
 
     private fun reviewIndexFor(p: Passage): Int {
         val idx = progressOf(p).bestCleanIndex
-        return if (idx == Int.MAX_VALUE) AutoDifficulty.FRESH_START_INDEX else idx
+        return if (idx == Int.MAX_VALUE) Int.MAX_VALUE else idx // MAX → easiest rung
     }
 
     private fun warmupIndexFor(p: Passage): Int {

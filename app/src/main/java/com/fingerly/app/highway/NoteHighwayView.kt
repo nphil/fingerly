@@ -64,6 +64,16 @@ class NoteHighwayView(
     /** Shorter for micro-passages so reps stay tight. */
     var leadInMs = LEAD_IN_MS
 
+    /**
+     * Wait mode: the clock freezes when a note reaches the hit line until the
+     * right key is pressed. Correctness is graded; timing is not.
+     */
+    var waitMode = false
+    private var waitFrom = 0
+    private var waitingNow = false
+    private var waitPromptIdx = -1
+    private val waitPrompt = StringBuilder(24)
+
     // --- clock ---
     private var anchorNanos = 0L
     private var songMs = -LEAD_IN_MS
@@ -225,11 +235,26 @@ class NoteHighwayView(
         worstFrameMs = 0f
         lastJudgedTotal = -1
         autoFrom = 0
+        waitFrom = 0
+        waitingNow = false
+        waitPromptIdx = -1
         java.util.Arrays.fill(autoOnSent, false)
         java.util.Arrays.fill(autoOffSent, false)
         java.util.Arrays.fill(pressed, false)
         java.util.Arrays.fill(wrongKeyUntil, 0L)
         rebuildHud()
+    }
+
+    /** First chart note still pending (notes are start-sorted). */
+    private fun nextPendingStartMs(): Long {
+        while (waitFrom < notes.size && judge.stateOf(waitFrom) != HitJudge.STATE_PENDING) {
+            waitFrom++
+        }
+        return if (waitFrom < notes.size) {
+            (notes[waitFrom].startSeconds * 1000).toLong()
+        } else {
+            Long.MAX_VALUE
+        }
     }
 
     /** Emits due autoplay note-ons/offs into the MIDI pipeline. Allocation-free. */
@@ -306,7 +331,23 @@ class NoteHighwayView(
         }
         lastFrameNanos = frameTimeNanos
 
-        songMs = (frameTimeNanos - anchorNanos) / 1_000_000 - leadInMs
+        var raw = (frameTimeNanos - anchorNanos) / 1_000_000 - leadInMs
+        waitingNow = false
+        if (waitMode && !ended) {
+            val target = nextPendingStartMs()
+            if (target != Long.MAX_VALUE && raw > target) {
+                // Freeze the clock at the note: shift the anchor by the overshoot.
+                anchorNanos += (raw - target) * 1_000_000
+                raw = target
+                waitingNow = true
+                if (waitPromptIdx != waitFrom) {
+                    waitPromptIdx = waitFrom
+                    waitPrompt.setLength(0)
+                    waitPrompt.append("Press ").append(noteLabels[notes[waitFrom].midiNote])
+                }
+            }
+        }
+        songMs = raw
         if (autoplay && !ended) pumpAutoplay()
         ring.drain(drainHandler)
         if (!ended) {
@@ -353,6 +394,12 @@ class NoteHighwayView(
         canvas.drawLine(0f, keyboardTop, width.toFloat(), keyboardTop, hitLinePaint)
         canvas.drawText(hudLine, 0, hudLine.length, 24f, 48f, hudPaint)
         canvas.drawText(perfLine, 0, perfLine.length, 24f, 96f, hudPaint)
+        if (waitingNow) {
+            canvas.drawText(
+                waitPrompt, 0, waitPrompt.length,
+                width * 0.42f, keyboardTop - 60f, bigPaint,
+            )
+        }
         if (ended) {
             canvas.drawText(endLine1, 0, endLine1.length, width * 0.30f, height * 0.38f, bigPaint)
             canvas.drawText(endLine2, 0, endLine2.length, width * 0.30f, height * 0.38f + 80f, hudPaint)

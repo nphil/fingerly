@@ -41,13 +41,14 @@ class SessionEngineTest {
     }
 
     @Test
-    fun freshPassageStartsSingleHandedAndSlow() {
+    fun freshPassageStartsSingleHandedInWaitMode() {
         val e = engine()
         e.begin()
         val step = e.onAttempt(result(90f)) // → WORK
         assertEquals(SessionEngine.Phase.WORK, step.phase)
         assertNotEquals(HAND_BOTH, step.setting.hand)
-        assertTrue(step.setting.tempoMultiplier < 0.7)
+        // The very first exposure has no timing pressure at all.
+        assertTrue(step.setting.wait)
     }
 
     @Test

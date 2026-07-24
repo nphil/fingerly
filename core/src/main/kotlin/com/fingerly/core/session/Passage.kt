@@ -27,6 +27,12 @@ data class PracticeSetting(
     val hand: Int, // HAND_BOTH or a single hand
     /** Bars from the passage start to practice (shrunk when struggling). */
     val bars: Int,
+    /**
+     * Wait mode: the song pauses at each note until the right key is pressed —
+     * key-finding is learned before timing pressure exists. Only correctness
+     * is graded.
+     */
+    val wait: Boolean = false,
 )
 
 /** Builds the playable score for one passage at one difficulty setting. */

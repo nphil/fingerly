@@ -163,6 +163,7 @@ fun SessionScreen(engine: MidiEngine, score: Score, onExit: () -> Unit) {
                         ).apply {
                             tapToRestart = false
                             leadInMs = 2000
+                            waitMode = state.step.setting.wait
                             autoplay = state.listen
                             onEnded = { judge -> onRunEnded(state.step, judge, state.listen) }
                         }
@@ -271,7 +272,12 @@ private fun stepLabel(step: SessionEngine.Step): String {
         .filter { s.hand == HAND_BOTH || it.hand == s.hand }
         .minByOrNull { it.startSeconds }
     val firstTxt = first?.let { "  ·  first note ${noteName(it.midiNote)}" } ?: ""
-    return "$bars  ·  $hand  ·  ${(s.tempoMultiplier * 100).toInt()}% tempo$firstTxt"
+    val pace = if (s.wait) {
+        "notes wait for you"
+    } else {
+        "${(s.tempoMultiplier * 100).toInt()}% tempo"
+    }
+    return "$bars  ·  $hand  ·  $pace$firstTxt"
 }
 
 private val NOTE_NAMES =
