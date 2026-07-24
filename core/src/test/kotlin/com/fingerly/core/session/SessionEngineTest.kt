@@ -142,13 +142,10 @@ class SessionEngineTest {
     }
 
     @Test
-    fun srsSchedulesFailuresSoonerThanSuccesses() {
-        val fail = Srs.nextIntervalDays(3.0, 40f)
-        val shaky = Srs.nextIntervalDays(3.0, 78f)
-        val clean = Srs.nextIntervalDays(3.0, 95f)
-        assertTrue(fail < shaky)
-        assertTrue(shaky < 3.0)
-        assertTrue(clean > 3.0)
+    fun schedulingFailuresComeBackSoonerThanSuccesses() {
+        val fail = Fsrs.intervalDays(Fsrs.initial(Fsrs.gradeOf(40f)))
+        val clean = Fsrs.intervalDays(Fsrs.initial(Fsrs.gradeOf(95f)))
+        assertTrue(fail < clean)
     }
 
     @Test

@@ -24,6 +24,10 @@ class PassageProgress(
     var dueAtMs: Long = 0L,
     var leftEma: Float = -1f,
     var rightEma: Float = -1f,
+    /** FSRS memory state (SPEC §3); 0 stability = never reviewed. */
+    var stability: Double = 0.0,
+    var fsrsDifficulty: Double = 0.0,
+    var lastReviewMs: Long = 0L,
 ) {
     fun record(result: AttemptResult, ladderIndex: Int) {
         attempts++
@@ -116,8 +120,20 @@ class SessionEngine(
         totalAttempts++
         val pr = progressOf(activePassage())
         pr.record(result, ladderIndex)
-        pr.intervalDays = Srs.nextIntervalDays(pr.intervalDays, result.accuracyPercent)
-        pr.dueAtMs = Srs.dueAtMs(nowMs(), pr.intervalDays)
+        // FSRS review with a measured grade (SPEC §3).
+        val now = nowMs()
+        val grade = Fsrs.gradeOf(result.accuracyPercent)
+        val card = if (pr.stability <= 0.0) {
+            Fsrs.initial(grade)
+        } else {
+            val elapsedDays = (now - pr.lastReviewMs) / 86_400_000.0
+            Fsrs.review(Fsrs.Card(pr.stability, pr.fsrsDifficulty), grade, elapsedDays)
+        }
+        pr.stability = card.stability
+        pr.fsrsDifficulty = card.difficulty
+        pr.lastReviewMs = now
+        pr.intervalDays = Fsrs.intervalDays(card)
+        pr.dueAtMs = now + (pr.intervalDays * 86_400_000.0).toLong()
         if (result.accuracyPercent >= AutoDifficulty.CLEAN_AT) {
             recordFinishCandidate(activePassage(), ladder[ladderIndex])
         }

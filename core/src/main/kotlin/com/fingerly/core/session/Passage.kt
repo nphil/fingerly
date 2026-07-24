@@ -17,6 +17,8 @@ class Passage(
     val notes: List<ChartNote>,
     /** Position in the difficulty ordering, 0 = easiest (SPEC §4). */
     val difficultyRank: Int,
+    /** Skill tags this passage demands (SPEC §4), e.g. "leaps", "chords". */
+    val skills: Set<String> = emptySet(),
 ) {
     val barCount: Int get() = endMeasure - startMeasure + 1
 }

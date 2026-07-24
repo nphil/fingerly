@@ -52,7 +52,7 @@ class SessionRepository(private val db: FingerlyDatabase) {
                         endMeasure = p.endMeasure,
                         hand = "BOTH",
                         orderIndex = p.difficultyRank,
-                        skillTags = "", // skill tagging arrives in Phase 4
+                        skillTags = p.skills.sorted().joinToString(","),
                     )
                 },
             )
@@ -84,8 +84,15 @@ class SessionRepository(private val db: FingerlyDatabase) {
                     )
                 }
                 db.srsCardDao().forPassage(dbId)?.let { card ->
-                    pr.intervalDays = card.stability
+                    pr.stability = card.stability
+                    pr.fsrsDifficulty = card.difficulty
+                    pr.lastReviewMs = card.lastReviewedAtEpochMs ?: 0L
                     pr.dueAtMs = card.dueAtEpochMs
+                    if (card.stability > 0) {
+                        pr.intervalDays = com.fingerly.core.session.Fsrs.intervalDays(
+                            com.fingerly.core.session.Fsrs.Card(card.stability, card.difficulty),
+                        )
+                    }
                 }
                 out[coreId] = pr
             }
@@ -146,11 +153,11 @@ class SessionRepository(private val db: FingerlyDatabase) {
             SrsCardEntity(
                 id = db.srsCardDao().forPassage(passageDbId)?.id ?: 0,
                 passageId = passageDbId,
-                stability = progress.intervalDays,
-                difficulty = 0.0, // FSRS difficulty arrives in Phase 4
+                stability = progress.stability,
+                difficulty = progress.fsrsDifficulty,
                 reps = progress.attempts,
                 lapses = 0,
-                lastReviewedAtEpochMs = System.currentTimeMillis(),
+                lastReviewedAtEpochMs = progress.lastReviewMs,
                 dueAtEpochMs = progress.dueAtMs,
             ),
         )

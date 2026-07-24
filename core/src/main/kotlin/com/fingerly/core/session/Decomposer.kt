@@ -46,9 +46,52 @@ object Decomposer {
                 endMeasure = range.last,
                 notes = notes,
                 difficultyRank = rankOf.getValue(i),
+                skills = skillsOf(notes),
             )
         }
     }
+
+    /**
+     * Skill tags (SPEC §4): which demands this passage makes. Drives per-skill
+     * mistake attribution (§8a) and just-in-time drills.
+     */
+    fun skillsOf(notes: List<com.fingerly.core.song.ChartNote>): Set<String> {
+        if (notes.isEmpty()) return emptySet()
+        val skills = HashSet<String>(6)
+
+        if (notes.any { BLACK_SEMITONES.contains(it.midiNote % 12) }) skills.add(SKILL_BLACK_KEYS)
+
+        // Per-hand analysis: leaps and chords.
+        for (hand in 0..1) {
+            val handNotes = notes.filter { it.hand == hand }.sortedBy { it.startSeconds }
+            if (handNotes.isEmpty()) continue
+            val byStart = handNotes.groupBy { (it.startSeconds * 1000).toLong() }
+            if (byStart.values.any { it.size > 1 }) skills.add(SKILL_CHORDS)
+            val starts = byStart.keys.sorted()
+            for (j in 1 until starts.size) {
+                val prev = byStart.getValue(starts[j - 1]).maxOf { it.midiNote }
+                val cur = byStart.getValue(starts[j]).minOf { it.midiNote }
+                if (Math.abs(cur - prev) > LEAP_SEMITONES) {
+                    skills.add(SKILL_LEAPS)
+                    break
+                }
+            }
+        }
+
+        // Hand independence: both hands sounding in overlapping time.
+        val left = notes.filter { it.hand == com.fingerly.core.song.ChartNote.HAND_LEFT }
+        val right = notes.filter { it.hand == com.fingerly.core.song.ChartNote.HAND_RIGHT }
+        if (left.isNotEmpty() && right.isNotEmpty()) skills.add(SKILL_HANDS_TOGETHER)
+
+        return skills
+    }
+
+    const val SKILL_LEAPS = "leaps"
+    const val SKILL_CHORDS = "chords"
+    const val SKILL_HANDS_TOGETHER = "hands-together"
+    const val SKILL_BLACK_KEYS = "black-keys"
+    private const val LEAP_SEMITONES = 5
+    private val BLACK_SEMITONES = setOf(1, 3, 6, 8, 10)
 
     private fun difficultyOf(
         notes: List<com.fingerly.core.song.ChartNote>,
