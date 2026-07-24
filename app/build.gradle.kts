@@ -26,10 +26,11 @@ android {
             // Keystore decoded from the KEYSTORE_B64 secret in CI (SPEC §9).
             val ks = rootProject.file("keystore.jks")
             if (ks.exists()) {
+                // trim(): secrets pasted on mobile can pick up stray whitespace/newlines
                 storeFile = ks
-                storePassword = System.getenv("KEYSTORE_PASSWORD")
-                keyAlias = System.getenv("KEY_ALIAS")
-                keyPassword = System.getenv("KEY_PASSWORD")
+                storePassword = System.getenv("KEYSTORE_PASSWORD")?.trim()
+                keyAlias = System.getenv("KEY_ALIAS")?.trim()
+                keyPassword = System.getenv("KEY_PASSWORD")?.trim()
             }
         }
     }
