@@ -35,3 +35,5 @@ sessions · decision menus before playing.
   from them (SPEC §9).
 - Run `./gradlew test` before pushing; CI fails the build on test failure.
 - Prefer editing files over regenerating them.
+- Keep chat replies concise; when asking the user to act, summarize their next
+  steps in one paragraph max.
