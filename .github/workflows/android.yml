@@ -54,24 +54,27 @@ jobs:
         if: env.KEYSTORE_B64 != ''
         run: echo "$KEYSTORE_B64" | base64 -d --ignore-garbage > keystore.jks
 
-      # Fail fast with a readable message if the keystore/password/alias secrets
-      # don't line up, instead of a cryptic packageRelease error later.
-      - name: Verify keystore secrets
+      # Verify the keystore opens and read the key alias directly from it —
+      # the single-key keystore is the source of truth, so a mistyped KEY_ALIAS
+      # secret can't break signing.
+      - name: Verify keystore and resolve key alias
         if: env.KEYSTORE_B64 != ''
+        id: keystore
         env:
           KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
-          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
         run: |
-          keytool -list -keystore keystore.jks -storepass "$(printf %s "$KEYSTORE_PASSWORD" | tr -d '[:space:]')" > /tmp/aliases.txt \
+          pass=$(printf %s "$KEYSTORE_PASSWORD" | tr -d '[:space:]')
+          keytool -list -keystore keystore.jks -storepass "$pass" > /tmp/aliases.txt \
             || { echo "::error::KEYSTORE_PASSWORD does not open the keystore"; exit 1; }
-          alias_trimmed=$(printf %s "$KEY_ALIAS" | tr -d '[:space:]')
-          grep -qi "^${alias_trimmed}," /tmp/aliases.txt \
-            || { echo "::error::KEY_ALIAS '${alias_trimmed}' not found. Keystore contains:"; grep -i "PrivateKeyEntry" /tmp/aliases.txt; exit 1; }
+          alias=$(grep -i "PrivateKeyEntry" /tmp/aliases.txt | head -1 | cut -d',' -f1 | tr -d '[:space:]')
+          [ -n "$alias" ] || { echo "::error::no PrivateKeyEntry found in keystore"; exit 1; }
+          echo "alias=$alias" >> "$GITHUB_OUTPUT"
+          echo "Using key alias: $alias"
 
       - name: Assemble release APK
         env:
           KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
-          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_ALIAS: ${{ steps.keystore.outputs.alias || secrets.KEY_ALIAS }}
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
         run: >
           ./gradlew assembleRelease
