@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-  Fingerly glyph: three finger/falling-note capsules of finger-like lengths.
-  Geometry lives in the adaptive-icon safe zone (66dp circle centered in 108dp).
-  Source SVG: art/fingerly-icon.svg — keep the two in sync.
+  Monochrome layer for Material You themed icons (Android 13+): same glyph as
+  ic_launcher_foreground, single color — the launcher tints it from the system
+  palette, so fill color here is nominal.
 -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp"
@@ -10,12 +10,12 @@
     android:viewportWidth="108"
     android:viewportHeight="108">
     <path
-        android:fillColor="#00E676"
+        android:fillColor="#FFFFFF"
         android:pathData="M30,44 a6,6 0 0 1 12,0 V68 a6,6 0 0 1 -12,0 Z" />
     <path
-        android:fillColor="#00E676"
+        android:fillColor="#FFFFFF"
         android:pathData="M48,36 a6,6 0 0 1 12,0 V70 a6,6 0 0 1 -12,0 Z" />
     <path
-        android:fillColor="#00E676"
+        android:fillColor="#FFFFFF"
         android:pathData="M66,46 a6,6 0 0 1 12,0 V66 a6,6 0 0 1 -12,0 Z" />
 </vector>

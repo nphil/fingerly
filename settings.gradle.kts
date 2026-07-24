@@ -19,6 +19,6 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "KeyQuest"
+rootProject.name = "Fingerly"
 include(":core")
 include(":app")

@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 108 108" width="512" height="512">
+  <!--
+    Fingerly launcher icon — source of truth for the Android vector drawables:
+      app/src/main/res/drawable/ic_launcher_foreground.xml (glyph, brand colors)
+      app/src/main/res/drawable/ic_launcher_monochrome.xml (glyph, Material You tinted)
+    Glyph: three finger/falling-note capsules, finger-like staggered lengths.
+    Full-bleed 108x108 canvas; keep the glyph inside the 66dp-diameter safe zone.
+  -->
+  <rect width="108" height="108" rx="24" fill="#101418"/>
+  <g fill="#00E676">
+    <path d="M30,44 a6,6 0 0 1 12,0 V68 a6,6 0 0 1 -12,0 Z"/>
+    <path d="M48,36 a6,6 0 0 1 12,0 V70 a6,6 0 0 1 -12,0 Z"/>
+    <path d="M66,46 a6,6 0 0 1 12,0 V66 a6,6 0 0 1 -12,0 Z"/>
+  </g>
+</svg>

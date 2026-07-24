@@ -1,4 +1,4 @@
-# KeyQuest
+# Fingerly
 
 Personal piano-learning app for one specific Android tablet + USB MIDI piano.
 **Full spec: `docs/SPEC.md`** — reference sections by number; all decisions there are

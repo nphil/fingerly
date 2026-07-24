@@ -10,11 +10,11 @@ val ciVersionCode = (project.findProperty("versionCode") as String?)?.toIntOrNul
 val ciVersionName = (project.findProperty("versionName") as String?) ?: "0.0.0-dev"
 
 android {
-    namespace = "com.keyquest.app"
+    namespace = "com.fingerly.app"
     compileSdk = 36
 
     defaultConfig {
-        applicationId = "com.keyquest"
+        applicationId = "com.fingerly"
         minSdk = 34
         targetSdk = 36
         versionCode = ciVersionCode

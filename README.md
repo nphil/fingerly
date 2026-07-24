@@ -1,4 +1,4 @@
-# KeyQuest
+# Fingerly
 
 Personal piano-learning app for a Xiaomi Pad 8 Pro + USB MIDI digital piano.
 Single user, fully local — no accounts, no backend, no analytics.
@@ -54,7 +54,7 @@ Set these GitHub Actions secrets (repo → Settings → Secrets and variables �
 Generate a keystore once with:
 
 ```bash
-keytool -genkeypair -v -keystore keystore.jks -alias keyquest \
+keytool -genkeypair -v -keystore keystore.jks -alias fingerly \
   -keyalg RSA -keysize 2048 -validity 10000
 ```
 
@@ -67,6 +67,6 @@ properly signed one.
 
 The app shows a first-run checklist for these, but for the record (SPEC §1):
 
-- Exclude KeyQuest from battery optimization (HyperOS throttles aggressively).
+- Exclude Fingerly from battery optimization (HyperOS throttles aggressively).
 - Set the per-app refresh rate to 144Hz (HyperOS may lock third-party apps to 60Hz).
 - Connect the piano over USB-C; the app uses class-compliant USB MIDI.
