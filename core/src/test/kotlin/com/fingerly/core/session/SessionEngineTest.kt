@@ -58,12 +58,23 @@ class SessionEngineTest {
         var step = e.onAttempt(result(90f)) // → WORK
         val startIndex = step.ladderIndex
 
-        step = e.onAttempt(result(40f)) // struggling
-        assertTrue(step.ladderIndex > startIndex)
+        step = e.onAttempt(result(60f)) // struggling: one rung easier
+        assertEquals(startIndex + 1, step.ladderIndex)
 
-        step = e.onAttempt(result(97f))
-        step = e.onAttempt(result(97f))
-        assertTrue(step.ladderIndex < startIndex + 1)
+        step = e.onAttempt(result(97f)) // first clean: hold (no lucky promotes)
+        assertEquals(startIndex + 1, step.ladderIndex)
+        step = e.onAttempt(result(97f)) // second consecutive clean: promote
+        assertEquals(startIndex, step.ladderIndex)
+    }
+
+    @Test
+    fun collapseDropsSeveralRungsAtOnce() {
+        val e = engine()
+        e.begin()
+        var step = e.onAttempt(result(90f)) // → WORK
+        val startIndex = step.ladderIndex
+        step = e.onAttempt(result(10f)) // collapse
+        assertTrue(step.ladderIndex >= startIndex + 3 || step.ladderIndex == AutoDifficulty.ladder(step.passage, 1).lastIndex)
     }
 
     @Test

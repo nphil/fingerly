@@ -89,6 +89,7 @@ class SessionEngine(
     private var bestCleanLabel: String? = null
     private var totalAttempts = 0
     private var warmupAttempts = 0
+    private var cleanStreak = 0
 
     fun begin(): Step {
         phaseStartMs = nowMs()
@@ -128,9 +129,20 @@ class SessionEngine(
             }
 
             Phase.WORK -> {
-                ladderIndex = AutoDifficulty.adjust(
-                    ladderIndex, ladder.lastIndex, result.accuracyPercent,
-                )
+                // Promote only after two consecutive clean-plus reps: logs showed
+                // a single lucky 100% causing a promote/fail ping-pong.
+                if (result.accuracyPercent >= AutoDifficulty.STEP_UP_AT) {
+                    cleanStreak++
+                    if (cleanStreak >= 2) {
+                        ladderIndex = (ladderIndex - 1).coerceAtLeast(0)
+                        cleanStreak = 0
+                    }
+                } else {
+                    cleanStreak = 0
+                    ladderIndex = AutoDifficulty.adjust(
+                        ladderIndex, ladder.lastIndex, result.accuracyPercent,
+                    )
+                }
                 val masteredToday =
                     pr.bestCleanIndex <= PassageProgress.SESSION_TARGET_INDEX
                 if (elapsed() >= workMs || (masteredToday && ladderIndex == 0)) enterReview()
@@ -251,6 +263,7 @@ class SessionEngine(
     private fun setLadderFor(p: Passage, index: Int) {
         ladder = AutoDifficulty.ladder(p, progressOf(p).weakerHand())
         ladderIndex = index.coerceIn(0, ladder.lastIndex)
+        cleanStreak = 0
         if (phase == Phase.REVIEW) workPassage = workPassage // no-op, review uses currentReview
     }
 

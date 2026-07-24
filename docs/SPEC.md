@@ -228,6 +228,27 @@ iOS, phone layouts, multiple user profiles.
 
 ---
 
+## 8a. Learner Model (user-directed addition, 2026-07)
+
+The crux of the app: it continuously builds a profile of THIS user from every
+attempt and caters lessons to it. Requirements:
+
+- Every attempt records rich mistake data (wrong notes, timing bias, per-hand
+  accuracy, per-skill errors once tagging exists) — already in place since
+  Phase 3; never regress this.
+- A batch analysis pass runs **between** sessions (menu/idle time, never during
+  play — SPEC §1 hot-path rules): recompute per-skill weakness, learning rate
+  per skill, forgetting curves (personalized FSRS parameters), optimal passage
+  sizes and ladder step sizes for this learner.
+- The profile drives: what to practice next, drill generation, decomposition
+  granularity, difficulty step sizes, and review scheduling.
+- Compute note: current data volumes (thousands of attempts, KBs) need only
+  classical statistics on CPU — fast and exact. The NPU is reserved for future
+  audio transcription (mic input mode), not the learner model, unless data
+  volumes ever genuinely demand it.
+
+---
+
 ## 9. Repo, CI/CD & Versioning (set up before Phase 1 code)
 
 **Workflow**: trunk-based — all commits push directly to `main`. No PRs, no
