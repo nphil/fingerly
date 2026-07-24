@@ -75,6 +75,7 @@ class MidiEngine(context: Context) {
 
     fun stop() {
         midiManager.unregisterDeviceCallback(deviceCallback)
+        demoSynth.stop()
         disconnect()
         thread.quitSafely()
     }
@@ -109,12 +110,27 @@ class MidiEngine(context: Context) {
     }
 
     /**
+     * Demo-only tone synth: audible feedback for the virtual piano. Real USB MIDI
+     * never routes through it — the piano makes its own sound (SPEC §1).
+     */
+    val demoSynth = DemoToneSynth()
+
+    /** Enable while the virtual piano screen is open; disable on leave. */
+    fun setDemoSoundEnabled(enabled: Boolean) {
+        if (enabled) demoSynth.start() else demoSynth.stop()
+    }
+
+    /**
      * Demo mode: inject a synthetic event. Posted to the MIDI thread so the ring's
      * single-producer invariant holds even while a real device is streaming.
      * Not a hot path — allocation here is fine.
      */
     fun injectVirtual(type: Int, note: Int, velocity: Int) {
         handler.post {
+            when (type) {
+                com.fingerly.core.midi.MidiEvent.TYPE_NOTE_ON -> demoSynth.noteOn(note, velocity)
+                com.fingerly.core.midi.MidiEvent.TYPE_NOTE_OFF -> demoSynth.noteOff(note)
+            }
             val e = ring.tryClaim() ?: return@post
             e.set(type, 0, note, velocity, System.nanoTime())
             ring.publish()
@@ -129,12 +145,14 @@ class MidiEngine(context: Context) {
         override fun run() {
             if (!_demoPlaying.value) return
             val note = DEMO_SEQUENCE[demoStep % DEMO_SEQUENCE.size]
+            demoSynth.noteOn(note, 96)
             val e1 = ring.tryClaim()
             if (e1 != null) {
                 e1.set(com.fingerly.core.midi.MidiEvent.TYPE_NOTE_ON, 0, note, 96, System.nanoTime())
                 ring.publish()
             }
             handler.postDelayed({
+                demoSynth.noteOff(note)
                 val e2 = ring.tryClaim()
                 if (e2 != null) {
                     e2.set(com.fingerly.core.midi.MidiEvent.TYPE_NOTE_OFF, 0, note, 0, System.nanoTime())

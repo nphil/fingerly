@@ -18,6 +18,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -40,6 +41,15 @@ import com.fingerly.core.midi.MidiEvent
 @Composable
 fun VirtualPianoScreen(engine: MidiEngine, onBack: () -> Unit) {
     val demoPlaying by engine.demoPlaying.collectAsState()
+
+    // Tablet-speaker tones only while this screen is open (demo only, SPEC §1).
+    DisposableEffect(Unit) {
+        engine.setDemoSoundEnabled(true)
+        onDispose {
+            engine.setDemoPlaying(false)
+            engine.setDemoSoundEnabled(false)
+        }
+    }
 
     Box(Modifier.fillMaxSize()) {
         Column(
