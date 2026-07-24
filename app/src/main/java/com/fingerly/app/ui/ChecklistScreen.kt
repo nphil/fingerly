@@ -78,9 +78,9 @@ fun ChecklistScreen(
 
             ChecklistItem(
                 ok = refreshRate >= 120f,
-                title = "Per-app refresh rate: 144Hz (currently ${refreshRate.toInt()}Hz)",
+                title = "Per-app refresh rate: 120Hz (currently ${refreshRate.toInt()}Hz)",
                 detail = "HyperOS may lock third-party apps to 60Hz. " +
-                    "Settings → Display → Refresh rate → Fingerly → 144.",
+                    "Settings → Display → Refresh rate → Fingerly → highest (120).",
                 actionLabel = "Open app settings",
                 onAction = {
                     context.startActivity(

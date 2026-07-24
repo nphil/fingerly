@@ -9,7 +9,8 @@ backend, no analytics. Everything local.
 ## 1. Target Hardware & Platform (fixed, do not generalize)
 
 - **Device**: Xiaomi Pad 8 Pro — Snapdragon 8 Elite, Adreno 830, 12GB RAM,
-  11.2" 3200×2136 @ 144Hz, Android 16 / HyperOS 3, USB-C 3.2
+  11.2" 3200×2136 @ 144Hz panel (HyperOS caps non-game apps at 120Hz — 120Hz is
+  the operating target), Android 16 / HyperOS 3, USB-C 3.2
 - **Piano**: Digital piano over USB MIDI (class-compliant). The piano produces its own
   sound — the app does NOT synthesize audio for live playing.
 - **Stack**: Kotlin, Jetpack Compose for menus/screens. Custom Canvas/GL render layer
@@ -17,9 +18,10 @@ backend, no analytics. Everything local.
 - **Storage**: Local SQLite (Room). MusicXML/MIDI files on local storage.
 
 ### Performance requirements (priority #1 — non-negotiable)
-- Request and hold the 144Hz display mode explicitly (preferredDisplayModeId).
-  Never assume the OS picked it.
-- Keypress → visual response: **< 15ms** (≈2 frames @144Hz). Build a latency test
+- Request and hold the highest available display mode explicitly
+  (preferredDisplayModeId). HyperOS caps non-game apps at 120Hz, so **120Hz is the
+  target**; take 144Hz only if the OS ever grants it. Never assume the OS picked it.
+- Keypress → visual response: **< 15ms** (<2 frames @120Hz). Build a latency test
   screen into debug builds.
 - **Zero-allocation hot path**: pre-allocated object pools for MIDI events, notes,
   particles. No GC pressure in the render loop or MIDI pipeline. Any per-frame
@@ -181,7 +183,7 @@ Tiered celebration architecture; vary visuals per tier so rewards don't habituat
   is a **playback of the user's own recorded performance** of that passage.
 - The final 20% of every song = visible "boss fight" chapter with its own milestone
   ladder and distinct visual identity.
-- Art direction: high-quality, game-grade visuals throughout. 144fps under full
+- Art direction: high-quality, game-grade visuals throughout. 120fps under full
   particle load is a requirement, not a target (§1).
 
 ---
@@ -202,7 +204,7 @@ Tiered celebration architecture; vary visuals per tier so rewards don't habituat
   playback, focus mode, rescue sessions, "I'm lost" button polish.
 
 **Acceptance gates**: Phase 1 = measured latency <15ms on device. Phase 2 = zero
-dropped frames at 144Hz with 200 simultaneous particles (perf test). Phase 3+ =
+dropped frames at 120Hz with 200 simultaneous particles (perf test). Phase 3+ =
 each feature verified against §2 anti-patterns.
 
 ### Out of scope (do not build)

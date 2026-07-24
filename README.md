@@ -71,5 +71,6 @@ properly signed one.
 The app shows a first-run checklist for these, but for the record (SPEC §1):
 
 - Exclude Fingerly from battery optimization (HyperOS throttles aggressively).
-- Set the per-app refresh rate to 144Hz (HyperOS may lock third-party apps to 60Hz).
+- Set the per-app refresh rate to 120Hz (HyperOS may lock third-party apps to 60Hz,
+  and caps non-game apps at 120Hz — the app requests the highest mode it's offered).
 - Connect the piano over USB-C; the app uses class-compliant USB MIDI.

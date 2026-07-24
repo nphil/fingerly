@@ -67,7 +67,7 @@ fun ShellScreen(
                 text = if (refreshRate >= 120f) {
                     "Display: ${refreshRate.toInt()}Hz"
                 } else {
-                    "Display: ${refreshRate.toInt()}Hz — set per-app refresh to 144 (checklist)"
+                    "Display: ${refreshRate.toInt()}Hz — set per-app refresh to 120 (checklist)"
                 },
             )
 
