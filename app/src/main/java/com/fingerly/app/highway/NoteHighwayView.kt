@@ -84,6 +84,7 @@ class NoteHighwayView(
     // --- frame stats ---
     private var lastFrameNanos = 0L
     private var frameIntervalNanos = 8_333_333L
+    private var warmupFrames = 0 // skip stats while >0: screen transitions jank
     private var droppedFrames = 0
     private var worstFrameMs = 0f
     private var emaFps = 0f
@@ -162,6 +163,7 @@ class NoteHighwayView(
         drawFrom = 0
         particleCount = 0
         droppedFrames = 0
+        warmupFrames = WARMUP_FRAMES
         worstFrameMs = 0f
         lastJudgedTotal = -1
         autoFrom = 0
@@ -230,7 +232,13 @@ class NoteHighwayView(
         val refresh = display?.refreshRate ?: 0f
         if (refresh > 1f) frameIntervalNanos = (1_000_000_000f / refresh).toLong()
 
-        // Frame pacing stats (perf gate).
+        // Frame pacing stats (perf gate). The first frames after attach/restart
+        // include screen-transition and shader-warmup cost — not steady-state
+        // rendering — so they are excluded from the gate numbers.
+        if (warmupFrames > 0) {
+            warmupFrames--
+            lastFrameNanos = 0L
+        }
         if (lastFrameNanos != 0L) {
             val delta = frameTimeNanos - lastFrameNanos
             val deltaMs = delta / 1_000_000f
@@ -484,5 +492,6 @@ class NoteHighwayView(
         private const val HIT_BURST = 24
         private const val GRAVITY = 1500f
         private const val AUTOPLAY_VELOCITY = 80
+        private const val WARMUP_FRAMES = 12 // ~100ms @120Hz
     }
 }
