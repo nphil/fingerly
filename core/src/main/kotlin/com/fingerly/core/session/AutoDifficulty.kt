@@ -52,10 +52,16 @@ object AutoDifficulty {
     /** Rung a passage with no history starts on: one hand, slow, all bars. */
     const val FRESH_START_INDEX = 6
 
+    /** Below this the attempt collapsed: decompose fast, not one rung at a time. */
+    const val COLLAPSE_BELOW = 45f
+
     /**
      * Next ladder index after an attempt. [index] 0 is hardest; larger = easier.
+     * A collapsed rep drops several rungs at once — reaching a doable rung
+     * must never take a string of failures (SPEC §3: never hit a wall).
      */
     fun adjust(index: Int, lastIndex: Int, accuracyPercent: Float): Int = when {
+        accuracyPercent < COLLAPSE_BELOW -> (index + 3).coerceAtMost(lastIndex)
         accuracyPercent < STEP_DOWN_BELOW -> (index + 1).coerceAtMost(lastIndex)
         accuracyPercent >= STEP_UP_AT -> (index - 1).coerceAtLeast(0)
         else -> index

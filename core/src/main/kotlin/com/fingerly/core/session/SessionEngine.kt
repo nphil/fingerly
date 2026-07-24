@@ -155,7 +155,7 @@ class SessionEngine(
      * one rung easier immediately, no questions asked.
      */
     fun imLost(): Step {
-        ladderIndex = (ladderIndex + 1).coerceAtMost(ladder.lastIndex)
+        ladderIndex = (ladderIndex + 2).coerceAtMost(ladder.lastIndex)
         return currentStep()
     }
 
