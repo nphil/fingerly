@@ -92,6 +92,19 @@ class NoteHighwayView(
     private var waitPromptIdx = -1
     private val waitPrompt = StringBuilder(24)
 
+    // Wait-mode instrumentation for the foundations trainer: how long each
+    // prompt took, and which wrong keys were pressed while waiting on it.
+    private var clampStartNanos = 0L
+    private val waitLatencyMs = IntArray(notes.size)
+    private val wrongExpectedIdx = IntArray(WRONG_CAPACITY)
+    private val wrongPlayedNote = IntArray(WRONG_CAPACITY)
+    private var wrongEventCount = 0
+
+    fun waitLatencyMsAt(i: Int): Int = if (i < waitLatencyMs.size) waitLatencyMs[i] else 0
+    fun wrongEventCount(): Int = wrongEventCount
+    fun wrongExpectedIdxAt(k: Int): Int = wrongExpectedIdx[k]
+    fun wrongPlayedNoteAt(k: Int): Int = wrongPlayedNote[k]
+
     // --- clock ---
     private var anchorNanos = 0L
     private var songMs = -LEAD_IN_MS
@@ -209,8 +222,21 @@ class NoteHighwayView(
                     val idx = judge.onNoteOn(event.data1, evSongMs)
                     if (idx >= 0) {
                         spawnBurst(noteX[event.data1], keyboardTop, HIT_BURST)
+                        if (waitMode && idx < waitLatencyMs.size && clampStartNanos != 0L &&
+                            idx == waitFrom
+                        ) {
+                            waitLatencyMs[idx] =
+                                ((event.timestampNanos - clampStartNanos) / 1_000_000)
+                                    .toInt().coerceAtLeast(0)
+                            clampStartNanos = 0L
+                        }
                     } else if (event.data1 < 128) {
                         wrongKeyUntil[event.data1] = event.timestampNanos + WRONG_FLASH_NANOS
+                        if (waitMode && wrongEventCount < WRONG_CAPACITY) {
+                            wrongExpectedIdx[wrongEventCount] = waitFrom
+                            wrongPlayedNote[wrongEventCount] = event.data1
+                            wrongEventCount++
+                        }
                     }
                 }
             }
@@ -271,6 +297,9 @@ class NoteHighwayView(
         autoFrom = 0
         recCount = 0
         waitFrom = 0
+        clampStartNanos = 0L
+        wrongEventCount = 0
+        java.util.Arrays.fill(waitLatencyMs, 0)
         waitingNow = false
         waitPromptIdx = -1
         java.util.Arrays.fill(autoOnSent, false)
@@ -377,6 +406,7 @@ class NoteHighwayView(
                 waitingNow = true
                 if (waitPromptIdx != waitFrom) {
                     waitPromptIdx = waitFrom
+                    clampStartNanos = frameTimeNanos
                     waitPrompt.setLength(0)
                     waitPrompt.append("Press ").append(noteLabels[notes[waitFrom].midiNote])
                 }
@@ -672,6 +702,7 @@ class NoteHighwayView(
         private const val WARMUP_FRAMES = 12 // ~100ms @120Hz
         private const val WRONG_FLASH_NANOS = 450_000_000L
         private const val REC_CAPACITY = 4096
+        private const val WRONG_CAPACITY = 256
         private val LETTERS =
             arrayOf("C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B")
     }

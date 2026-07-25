@@ -22,7 +22,7 @@ import com.fingerly.app.midi.MidiEngine
 import com.fingerly.app.data.SongCatalog
 import kotlinx.coroutines.flow.StateFlow
 
-enum class Screen { Shell, Checklist, LatencyTest, VirtualPiano, Settings, Highway, Session, Dashboard, Library }
+enum class Screen { Shell, Checklist, LatencyTest, VirtualPiano, Settings, Highway, Session, Dashboard, Library, Basics }
 
 private val DarkScheme: ColorScheme = darkColorScheme(
     primary = Color(0xFF00E676),
@@ -83,6 +83,7 @@ fun FingerlyApp(
                     onOpenSession = { screen = Screen.Session },
                     onOpenDashboard = { screen = Screen.Dashboard },
                     onOpenLibrary = { screen = Screen.Library },
+                    onOpenBasics = { screen = Screen.Basics },
                     songTitle = currentScore.title,
                 )
 
@@ -114,13 +115,11 @@ fun FingerlyApp(
                 )
 
                 Screen.Session -> {
-                    // Foundations gate: hands-on basics before song sessions
-                    // (SPEC §2.5/§4). Completed or skipped once → songs forever.
+                    // Foundations gate: adaptive basics training before song
+                    // sessions (SPEC §2.5/§4/§8a). Passed checkpoint or skipped
+                    // → songs; re-run any time from the shell.
                     var foundationsDone by remember {
-                        mutableStateOf(
-                            prefs.getInt(PREF_FOUNDATIONS_INDEX, 0) >=
-                                com.fingerly.core.session.Foundations.lessons().size,
-                        )
+                        mutableStateOf(prefs.getBoolean(PREF_FOUNDATIONS_DONE, false))
                     }
                     if (!foundationsDone) {
                         FoundationsScreen(
@@ -143,6 +142,12 @@ fun FingerlyApp(
                 Screen.Dashboard -> DashboardScreen(
                     engine = engine,
                     onBack = { screen = Screen.Shell },
+                )
+
+                Screen.Basics -> FoundationsScreen(
+                    engine = engine,
+                    onCompleted = { screen = Screen.Shell },
+                    onExit = { screen = Screen.Shell },
                 )
 
                 Screen.Library -> LibraryScreen(

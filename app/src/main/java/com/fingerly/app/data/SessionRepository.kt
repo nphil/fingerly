@@ -230,6 +230,12 @@ class SessionRepository(private val db: FingerlyDatabase) {
             RecordingCodec.decode(java.io.File(entity.filePath).readBytes())
         }.getOrElse { emptyList() }
 
+    suspend fun getSetting(key: String): String? =
+        withContext(Dispatchers.IO) { db.appSettingDao().get(key) }
+
+    suspend fun putSetting(key: String, value: String) =
+        withContext(Dispatchers.IO) { db.appSettingDao().put(AppSettingEntity(key, value)) }
+
     suspend fun allSongs(): List<SongEntity> =
         withContext(Dispatchers.IO) { db.songDao().all() }
 
