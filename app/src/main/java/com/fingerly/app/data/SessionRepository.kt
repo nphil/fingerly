@@ -2,6 +2,7 @@ package com.fingerly.app.data
 
 import com.fingerly.core.session.AttemptResult
 import com.fingerly.core.session.HAND_BOTH
+import com.fingerly.core.session.LearnerProfile
 import com.fingerly.core.session.Passage
 import com.fingerly.core.session.PassageProgress
 import com.fingerly.core.session.PracticeSetting
