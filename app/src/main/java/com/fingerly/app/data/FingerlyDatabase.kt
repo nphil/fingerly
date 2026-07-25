@@ -14,8 +14,9 @@ import androidx.room.RoomDatabase
         MidiRecordingEntity::class,
         SrsCardEntity::class,
         AppSettingEntity::class,
+        FoundationsTrialEntity::class,
     ],
-    version = 3,
+    version = 4,
     exportSchema = true,
 )
 abstract class FingerlyDatabase : RoomDatabase() {
@@ -26,6 +27,7 @@ abstract class FingerlyDatabase : RoomDatabase() {
     abstract fun midiRecordingDao(): MidiRecordingDao
     abstract fun srsCardDao(): SrsCardDao
     abstract fun appSettingDao(): AppSettingDao
+    abstract fun foundationsTrialDao(): FoundationsTrialDao
 
     companion object {
         @Volatile

@@ -92,6 +92,37 @@ class NoteHighwayView(
     private var waitPromptIdx = -1
     private val waitPrompt = StringBuilder(24)
 
+    /**
+     * Recall mode (foundations): draw NO answer. The prompt names a key and the
+     * learner must produce it — no falling rectangle, no note name on the note,
+     * no pre-lit key, no white-key letters (Rowland 2014: recall ≫ recognition).
+     */
+    var recallMode = false
+
+    /** Show the black-key landmark after this long on one prompt; 0 disables. */
+    var revealAfterMs = 0L
+
+    /** Force-miss a prompt after this long so a run can always finish; 0 disables. */
+    var forceAdvanceAfterMs = 0L
+
+    /** Per-chart-note prompt text override, e.g. "F" at rung 0 vs "F4" beyond. */
+    var promptLabels: Array<String>? = null
+
+    /** Suppress the live accuracy/miss/extra/combo HUD (evaluative verdict). */
+    var showHud = true
+
+    private var revealedIdx = -1
+    private val revealedFlag = BooleanArray(notes.size)
+
+    /** True when prompt [i] was revealed or force-advanced — not unaided. */
+    fun wasRevealedAt(i: Int): Boolean = i < revealedFlag.size && revealedFlag[i]
+
+    private fun promptLabelAt(i: Int): String {
+        val labels = promptLabels
+        if (labels != null && i < labels.size) return labels[i]
+        return noteLabels[notes[i].midiNote]
+    }
+
     // Wait-mode instrumentation for the foundations trainer: how long each
     // prompt took, and which wrong keys were pressed while waiting on it.
     private var clampStartNanos = 0L
@@ -100,7 +131,8 @@ class NoteHighwayView(
     private val wrongPlayedNote = IntArray(WRONG_CAPACITY)
     private var wrongEventCount = 0
 
-    fun waitLatencyMsAt(i: Int): Int = if (i < waitLatencyMs.size) waitLatencyMs[i] else 0
+    /** Prompt→correct-key latency in ms, or -1 when never measured. */
+    fun waitLatencyMsAt(i: Int): Int = if (i < waitLatencyMs.size) waitLatencyMs[i] else -1
     fun wrongEventCount(): Int = wrongEventCount
     fun wrongExpectedIdxAt(k: Int): Int = wrongExpectedIdx[k]
     fun wrongPlayedNoteAt(k: Int): Int = wrongPlayedNote[k]
@@ -182,6 +214,9 @@ class NoteHighwayView(
         typeface = Typeface.MONOSPACE
     }
     private val middleCPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.rgb(0, 230, 118) }
+    private val landmarkPaint = Paint().apply { color = Color.rgb(120, 90, 30) }
+    private val progressBarPaint = Paint().apply { color = Color.rgb(0, 145, 75) }
+    private val progressTrackPaint = Paint().apply { color = Color.rgb(30, 38, 44) }
     private val dimWhiteKeyPaint = Paint().apply { color = Color.rgb(150, 152, 150) }
     private val dimBlackKeyPaint = Paint().apply { color = Color.rgb(14, 18, 22) }
     private val keyLetterPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -232,8 +267,13 @@ class NoteHighwayView(
                         }
                     } else if (event.data1 < 128) {
                         wrongKeyUntil[event.data1] = event.timestampNanos + WRONG_FLASH_NANOS
-                        if (waitMode && wrongEventCount < WRONG_CAPACITY) {
-                            wrongExpectedIdx[wrongEventCount] = waitFrom
+                        // Attribute to the CLAMPED prompt, and only while actually
+                        // waiting on one: presses during the lead-in or the gap
+                        // between prompts used to be blamed on the next prompt.
+                        if (waitMode && waitingNow && waitPromptIdx >= 0 &&
+                            wrongEventCount < WRONG_CAPACITY
+                        ) {
+                            wrongExpectedIdx[wrongEventCount] = waitPromptIdx
                             wrongPlayedNote[wrongEventCount] = event.data1
                             wrongEventCount++
                         }
@@ -299,7 +339,9 @@ class NoteHighwayView(
         waitFrom = 0
         clampStartNanos = 0L
         wrongEventCount = 0
-        java.util.Arrays.fill(waitLatencyMs, 0)
+        revealedIdx = -1
+        java.util.Arrays.fill(revealedFlag, false)
+        java.util.Arrays.fill(waitLatencyMs, -1) // -1 = not measured (0 meant "instant")
         waitingNow = false
         waitPromptIdx = -1
         java.util.Arrays.fill(autoOnSent, false)
@@ -408,7 +450,28 @@ class NoteHighwayView(
                     waitPromptIdx = waitFrom
                     clampStartNanos = frameTimeNanos
                     waitPrompt.setLength(0)
-                    waitPrompt.append("Press ").append(noteLabels[notes[waitFrom].midiNote])
+                    waitPrompt.append("Press ").append(promptLabelAt(waitFrom))
+                }
+                // Corrective feedback comes AFTER the retrieval attempt: hold the
+                // answer back, then show the black-key landmark (Rowland 2014).
+                val heldMs = (frameTimeNanos - clampStartNanos) / 1_000_000
+                if (clampStartNanos != 0L && revealAfterMs > 0 && heldMs >= revealAfterMs &&
+                    revealedIdx != waitFrom
+                ) {
+                    revealedIdx = waitFrom
+                    if (waitFrom < revealedFlag.size) revealedFlag[waitFrom] = true
+                }
+                // Hard escape: a key that cannot be found must never freeze the
+                // run forever. Force the miss and move on.
+                if (clampStartNanos != 0L && forceAdvanceAfterMs > 0 &&
+                    heldMs >= forceAdvanceAfterMs
+                ) {
+                    if (waitFrom < revealedFlag.size) revealedFlag[waitFrom] = true
+                    judge.forceMiss(waitFrom)
+                    clampStartNanos = 0L
+                    waitPromptIdx = -1
+                    revealedIdx = -1
+                    waitingNow = false
                 }
             }
         }
@@ -462,8 +525,17 @@ class NoteHighwayView(
         val phase = ((songMs % beatMs) + beatMs) % beatMs
         hitLinePaint.alpha = if (waitingNow) 255 else (255 - phase * 185 / beatMs).toInt()
         canvas.drawLine(0f, keyboardTop, width.toFloat(), keyboardTop, hitLinePaint)
-        canvas.drawText(hudLine, 0, hudLine.length, 24f, 48f, hudPaint)
-        canvas.drawText(perfLine, 0, perfLine.length, 24f, 96f, hudPaint)
+        if (showHud) {
+            canvas.drawText(hudLine, 0, hudLine.length, 24f, 48f, hudPaint)
+            canvas.drawText(perfLine, 0, perfLine.length, 24f, 96f, hudPaint)
+        } else {
+            // No live verdict and no streak while drilling: adults with ADHD
+            // learn worse under immediate evaluative feedback (Gabay 2018), and a
+            // visibly falling accuracy percent is loss-framed (Aster 2024).
+            // Instead: a depleting bar showing how much of the drill remains, so
+            // the finish state is continuously visible (Plichta & Scheres).
+            drawDrillProgress(canvas)
+        }
         if (waitingNow) {
             canvas.drawText(
                 waitPrompt, 0, waitPrompt.length,
@@ -493,13 +565,24 @@ class NoteHighwayView(
             if (startIn * 1000 > LOOKAHEAD_MS) break
             val endIn = startIn + n.durationSeconds.toFloat()
             // Key guidance: a pending note at/crossing the hit line lights its key.
-            if (judge.stateOf(i) == HitJudge.STATE_PENDING && startIn <= 0.05f && endIn > 0f) {
+            // In recall mode this IS the answer, so it is withheld until the
+            // reveal timeout fires for that prompt.
+            if (judge.stateOf(i) == HitJudge.STATE_PENDING && startIn <= 0.05f && endIn > 0f &&
+                (!recallMode || revealedFlag[i])
+            ) {
                 keyDue[n.midiNote] = n.hand + 1
+                if (recallMode) markLandmarkGroup(n.midiNote)
             }
             var top = keyboardTop - endIn * pps
             var bottom = keyboardTop - startIn * pps
             if (bottom > keyboardTop) bottom = keyboardTop
             if (top < 0f) top = 0f
+            // Recall mode draws no falling note for a pending prompt — the
+            // rectangle's x-position and printed name are the answer.
+            if (recallMode && judge.stateOf(i) == HitJudge.STATE_PENDING && !revealedFlag[i]) {
+                i++
+                continue
+            }
             if (bottom > top) {
                 val paint = when (judge.stateOf(i)) {
                     HitJudge.STATE_HIT -> hitNotePaint
@@ -543,14 +626,34 @@ class NoteHighwayView(
             canvas.drawRect(noteRect, blackKeyPaintFor(n))
         }
         // Letter on every white key; octave number on Cs; middle C marked.
+        // Recall mode keeps ONLY the middle-C dot: printed letters are the answer.
         val labelY = h - 10f
-        for (n in lowNote..highNote) {
-            if (isBlack(n)) continue
-            val isC = n % 12 == 0
-            val label = if (isC) noteLabels[n] else LETTERS[n % 12]
-            val paint = if (n in rangeLow..rangeHigh) keyLetterPaint else labelPaint
-            canvas.drawText(label, noteX[n] - paint.measureText(label) / 2f, labelY, paint)
-            if (n == 60) canvas.drawCircle(noteX[n], labelY - 34f, 7f, middleCPaint)
+        if (!recallMode) {
+            for (n in lowNote..highNote) {
+                if (isBlack(n)) continue
+                val isC = n % 12 == 0
+                val label = if (isC) noteLabels[n] else LETTERS[n % 12]
+                val paint = if (n in rangeLow..rangeHigh) keyLetterPaint else labelPaint
+                canvas.drawText(label, noteX[n] - paint.measureText(label) / 2f, labelY, paint)
+                if (n == 60) canvas.drawCircle(noteX[n], labelY - 34f, 7f, middleCPaint)
+            }
+        } else {
+            canvas.drawCircle(noteX[60], labelY - 34f, 7f, middleCPaint)
+        }
+    }
+
+    /**
+     * Light the black-key group that anchors [midi] — the 2-group for C/D/E, the
+     * 3-group for F/G/A/B. This is the reveal: it teaches the landmark rule
+     * visually instead of restating it as text (SPEC §2.4).
+     */
+    private fun markLandmarkGroup(midi: Int) {
+        val octaveBase = (midi / 12) * 12
+        val inTwoGroup = (midi % 12) <= 4 // C, C#, D, D#, E
+        val offsets = if (inTwoGroup) intArrayOf(1, 3) else intArrayOf(6, 8, 10)
+        for (off in offsets) {
+            val n = octaveBase + off
+            if (n in lowNote..highNote) keyDue[n] = 3 // landmark tint
         }
     }
 
@@ -559,6 +662,8 @@ class NoteHighwayView(
         pressed[n] -> pressedPaint
         keyDue[n] == 1 -> dueRightPaint
         keyDue[n] == 2 -> dueLeftPaint
+        keyDue[n] == 3 -> landmarkPaint
+        recallMode -> whiteKeyPaint // no dimming: dimming narrows the answer space
         n !in rangeLow..rangeHigh -> dimWhiteKeyPaint
         else -> whiteKeyPaint
     }
@@ -568,6 +673,8 @@ class NoteHighwayView(
         pressed[n] -> pressedPaint
         keyDue[n] == 1 -> dueRightPaint
         keyDue[n] == 2 -> dueLeftPaint
+        keyDue[n] == 3 -> landmarkPaint
+        recallMode -> blackKeyPaint
         n !in rangeLow..rangeHigh -> dimBlackKeyPaint
         else -> blackKeyPaint
     }
@@ -617,6 +724,22 @@ class NoteHighwayView(
     }
 
     // ------------------------------------------------------------------ HUD / logs
+
+    /** Segmented remaining-prompt bar: position in the drill, no verdict. */
+    private fun drawDrillProgress(canvas: Canvas) {
+        val total = notes.size
+        if (total == 0) return
+        val done = judge.judgedCount().coerceAtMost(total)
+        val barW = width * 0.5f
+        val x0 = (width - barW) / 2f
+        val segW = barW / total
+        val y = 40f
+        for (i in 0 until total) {
+            val left = x0 + i * segW + 2f
+            noteRect.set(left, y, left + segW - 4f, y + 12f)
+            canvas.drawRect(noteRect, if (i < done) progressBarPaint else progressTrackPaint)
+        }
+    }
 
     private fun rebuildHud() {
         hudLine.setLength(0)

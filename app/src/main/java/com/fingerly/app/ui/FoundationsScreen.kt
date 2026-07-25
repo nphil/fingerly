@@ -9,7 +9,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.material3.Button
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
@@ -31,15 +30,16 @@ import com.fingerly.app.data.SessionRepository
 import com.fingerly.app.highway.NoteHighwayView
 import com.fingerly.app.log.RemoteLog
 import com.fingerly.app.midi.MidiEngine
-import com.fingerly.core.play.HitJudge
 import com.fingerly.core.session.FoundationsTrainer
 import kotlinx.coroutines.launch
 
 /**
- * Adaptive foundations trainer host. ADHD-informed structure: the mastery map
- * is always the home view (big picture, externalized progress), every drill is
- * ~45s and shaped identically, tips are ≤3 sentences, teaching happens in the
- * between-drill summary, and each sitting suggests a stop after a few drills.
+ * Foundations trainer host: RECALL drills on keyboard geography.
+ *
+ * The map is the home view (big picture, monotone counters that never drop).
+ * Each drill is ~8 prompts with the effort quantum stated on the button. The
+ * drill screen shows no verdict and no streak — only a depleting prompt bar —
+ * with the blunt summary after the drill (see docs/LEARNING.md for citations).
  */
 @Composable
 fun FoundationsScreen(engine: MidiEngine, onCompleted: () -> Unit, onExit: () -> Unit) {
@@ -49,68 +49,67 @@ fun FoundationsScreen(engine: MidiEngine, onCompleted: () -> Unit, onExit: () ->
     val prefs = remember { context.getSharedPreferences("fingerly", 0) }
 
     var trainer by remember { mutableStateOf<FoundationsTrainer?>(null) }
-    var drill by remember { mutableStateOf<FoundationsTrainer.Drill?>(null) }
-    var playing by remember { mutableStateOf(false) }
+    var runningDrill by remember { mutableStateOf<FoundationsTrainer.Drill?>(null) }
     var summary by remember { mutableStateOf<String?>(null) }
-    var drillsThisSitting by remember { mutableStateOf(0) }
+    var version by remember { mutableStateOf(0) }
+
+    val dayIndex = remember { (System.currentTimeMillis() / 86_400_000L).toInt() }
 
     LaunchedEffect(Unit) {
-        trainer = FoundationsTrainer(repo.getSetting(SETTING_KEY))
+        trainer = FoundationsTrainer(repo.getSetting(SETTING_KEY)).apply { startSitting(dayIndex) }
     }
 
-    fun persist() {
-        val t = trainer ?: return
+    fun persist(t: FoundationsTrainer) {
         scope.launch { repo.putSetting(SETTING_KEY, t.serialize()) }
     }
 
-    fun finishCourse() {
-        prefs.edit().putBoolean(PREF_FOUNDATIONS_DONE, true).apply()
-        onCompleted()
-    }
-
-    fun onDrillEnded(view: NoteHighwayView, judge: HitJudge, d: FoundationsTrainer.Drill) {
+    fun onDrillEnded(view: NoteHighwayView, d: FoundationsTrainer.Drill) {
         val t = trainer ?: return
-        // Per-prompt results from wait-mode instrumentation.
         val wrongByIdx = HashMap<Int, MutableList<Int>>()
         for (k in 0 until view.wrongEventCount()) {
             wrongByIdx.getOrPut(view.wrongExpectedIdxAt(k)) { ArrayList() }
                 .add(view.wrongPlayedNoteAt(k))
         }
         val results = d.prompts.mapIndexed { i, p ->
+            val revealed = view.wasRevealedAt(i)
+            val latency = view.waitLatencyMsAt(i)
             FoundationsTrainer.PromptResult(
                 atomId = p.atomId,
-                correctFirstTry = wrongByIdx[i].isNullOrEmpty(),
-                latencyMs = view.waitLatencyMsAt(i),
+                // Unaided = first press correct AND no reveal was needed.
+                unaided = wrongByIdx[i].isNullOrEmpty() && !revealed && latency >= 0,
+                revealed = revealed,
+                latencyMs = latency,
                 expectedNote = p.midiNote,
                 wrongPresses = wrongByIdx[i] ?: emptyList(),
             )
         }
-        val firstTry = results.count { it.correctFirstTry }
+        t.recordResults(results, dayIndex)
+        persist(t)
+
+        val unaided = results.count { it.unaided }
+        val revealedCount = results.count { it.revealed }
+        val latencies = results.filter { it.unaided && it.latencyMs >= 0 }.map { it.latencyMs }
+        // Raw per-trial rows: the durable asset every future retune runs on.
+        scope.launch {
+            repo.saveFoundationsTrials(dayIndex, d.focusAtom, results)
+        }
         RemoteLog.log(
             "foundations",
-            "${d.focusAtom} firstTry=$firstTry/${results.size} " +
-                "avgLat=${results.map { it.latencyMs }.average().toInt()}ms test=${d.isTest}",
+            "${d.focusAtom} unaided=$unaided/${results.size} revealed=$revealedCount " +
+                "medianLat=${latencies.sorted().getOrNull(latencies.size / 2) ?: -1}ms " +
+                "rung=${t.atoms.getValue(d.focusAtom).rung} " +
+                "days=${t.atoms.getValue(d.focusAtom).daysCredited}",
         )
-        playing = false
-        drillsThisSitting++
-        if (d.isTest) {
-            if (t.testPassed(results)) {
-                t.recordResults(results)
-                persist()
-                summary = "Checkpoint passed. " + t.report()
-                finishCourse()
-                return
+        summary = buildString {
+            append("$unaided/${results.size} from memory")
+            if (revealedCount > 0) append(" · $revealedCount needed the landmark")
+            if (latencies.isNotEmpty()) {
+                append(" · ${latencies.sorted()[latencies.size / 2] / 1000f}s median")
             }
-            t.recordResults(results)
-            persist()
-            summary = "Checkpoint not passed: $firstTry/${results.size} first-try. " + t.report()
-        } else {
-            t.recordResults(results)
-            persist()
-            summary = "$firstTry/${results.size} first-try · " +
-                "avg ${results.map { it.latencyMs }.average().toInt() / 1000f}s per key"
         }
-        drill = null
+        runningDrill = null
+        version++
+        if (t.songGateOpen()) prefs.edit().putBoolean(PREF_FOUNDATIONS_DONE, true).apply()
     }
 
     val t = trainer
@@ -118,69 +117,77 @@ fun FoundationsScreen(engine: MidiEngine, onCompleted: () -> Unit, onExit: () ->
         when {
             t == null -> Text("Loading…", Modifier.align(Alignment.Center), color = Dim2)
 
-            playing && drill != null -> {
-                val d = drill!!
+            runningDrill != null -> {
+                val d = runningDrill!!
                 AndroidView(
                     modifier = Modifier.fillMaxSize(),
                     factory = { ctx ->
                         NoteHighwayView(ctx, engine.ring, FoundationsTrainer.toScore(d)).apply {
                             tapToRestart = false
-                            leadInMs = 1500
+                            leadInMs = 900
                             waitMode = true
-                            onEnded = { judge -> onDrillEnded(this, judge, d) }
+                            recallMode = true // draw no answer: this is a recall test
+                            showHud = false // no live verdict, no streak
+                            revealAfterMs = t.config.revealAfterMs
+                            forceAdvanceAfterMs = t.config.forceAdvanceAfterMs
+                            promptLabels = Array(d.prompts.size) { d.prompts[it].label }
+                            onEnded = { onDrillEnded(this, d) }
                         }
                     },
-                )
-                Text(
-                    d.title + if (d.isTest) " — checkpoint" else "",
-                    Modifier.align(Alignment.TopCenter).padding(top = 12.dp),
-                    color = Dim2,
                 )
             }
 
             else -> {
-                // Home view: the map first, always (big picture + visible progress).
+                val rows = remember(version) { t.masteryRows() }
+                val next = remember(version) { t.previewDrill() }
                 Column(
                     modifier = Modifier.align(Alignment.Center).padding(horizontal = 48.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(6.dp),
                 ) {
-                    Text("Basics training", style = MaterialTheme.typography.headlineMedium)
-                    t.masteryRows().forEach { row ->
+                    Text("Basics", style = MaterialTheme.typography.headlineMedium)
+                    rows.forEach { row ->
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Text(
-                                (if (row.mastered) "✓ " else "   ") + row.label,
-                                Modifier.width(260.dp),
+                                (if (row.mastered) "✓ " else if (row.atCriterion) "· " else "  ") + row.label,
+                                Modifier.width(220.dp),
                                 color = if (row.mastered) Mint2 else Fg2,
                             )
-                            LinearProgressIndicator(
-                                progress = { row.percent / 100f },
-                                modifier = Modifier.width(220.dp),
-                                color = if (row.mastered) Mint2 else Color(0xFFFFB74D),
+                            Text(
+                                "${row.hitsToday}/${row.hitsWanted} today   " +
+                                    "${row.daysCredited}/${row.daysWanted} days" +
+                                    (if (row.rung > 0) "   +${row.rung} oct" else ""),
+                                color = Dim2,
                             )
-                            Text("  ${row.percent}%", color = Dim2)
                         }
                     }
                     if (summary != null) {
                         Text(summary!!, color = Fg2, modifier = Modifier.widthIn(max = 760.dp))
                     }
-                    val next = remember(summary, drillsThisSitting) { t.nextDrill() }
-                    if (next.tip != null) {
-                        Text(next.tip!!, color = Color(0xFFFFB74D), modifier = Modifier.widthIn(max = 760.dp))
+                    if (next?.tip != null) {
+                        Text(
+                            next.tip!!,
+                            color = Color(0xFFFFB74D),
+                            modifier = Modifier.widthIn(max = 760.dp),
+                        )
                     }
                     Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                        Button(onClick = {
-                            drill = next
-                            summary = null
-                            playing = true
-                        }) {
+                        if (next != null) {
+                            Button(onClick = {
+                                t.startDrill(next)
+                                persist(t)
+                                summary = null
+                                runningDrill = next
+                            }) { Text("${next.prompts.size} keys · ~60s") }
+                        } else {
                             Text(
-                                if (next.isTest) "Checkpoint test" else "Drill: ${next.title} (~45s)",
+                                t.sittingFinishLabel() + ". Nothing left today.",
+                                color = Mint2,
+                                modifier = Modifier.widthIn(max = 700.dp),
                             )
                         }
-                        if (drillsThisSitting >= 5) {
-                            OutlinedButton(onClick = onExit) { Text("Good stopping point — done") }
+                        OutlinedButton(onClick = onCompleted) {
+                            Text(if (t.songGateOpen()) "Go to song" else "Songs anyway")
                         }
-                        OutlinedButton(onClick = { finishCourse() }) { Text("Skip basics") }
                     }
                 }
             }

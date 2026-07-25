@@ -79,6 +79,24 @@ interface SrsCardDao {
 }
 
 @Dao
+interface FoundationsTrialDao {
+    @Insert
+    suspend fun insertAll(trials: List<FoundationsTrialEntity>)
+
+    @Query("SELECT * FROM foundations_trials WHERE atomId = :atomId ORDER BY atEpochMs")
+    suspend fun forAtom(atomId: String): List<FoundationsTrialEntity>
+
+    @Query("SELECT * FROM foundations_trials ORDER BY atEpochMs")
+    suspend fun all(): List<FoundationsTrialEntity>
+
+    @Query(
+        "SELECT COUNT(*) FROM foundations_trials WHERE atomId = :atomId AND unaided = 1 " +
+            "AND latencyMs >= 0",
+    )
+    suspend fun unaidedCount(atomId: String): Int
+}
+
+@Dao
 interface AppSettingDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun put(setting: AppSettingEntity)

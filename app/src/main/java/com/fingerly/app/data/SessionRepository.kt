@@ -230,6 +230,49 @@ class SessionRepository(private val db: FingerlyDatabase) {
             RecordingCodec.decode(java.io.File(entity.filePath).readBytes())
         }.getOrElse { emptyList() }
 
+    /** Raw per-prompt foundations rows (SPEC §8a): aggregates derive from these. */
+    suspend fun saveFoundationsTrials(
+        dayIndex: Int,
+        focusAtomId: String,
+        results: List<com.fingerly.core.session.FoundationsTrainer.PromptResult>,
+    ) = withContext(Dispatchers.IO) {
+        val now = System.currentTimeMillis()
+        db.foundationsTrialDao().insertAll(
+            results.map { r ->
+                var octave = 0
+                var neighbor = 0
+                var other = 0
+                for (wrong in r.wrongPresses) {
+                    when (
+                        com.fingerly.core.session.FoundationsTrainer
+                            .classifyError(r.expectedNote, wrong)
+                    ) {
+                        com.fingerly.core.session.FoundationsTrainer.ERROR_OCTAVE -> octave++
+                        com.fingerly.core.session.FoundationsTrainer.ERROR_NEIGHBOR -> neighbor++
+                        else -> other++
+                    }
+                }
+                FoundationsTrialEntity(
+                    atomId = r.atomId,
+                    focusAtomId = focusAtomId,
+                    atEpochMs = now,
+                    dayIndex = dayIndex,
+                    expectedNote = r.expectedNote,
+                    unaided = r.unaided,
+                    revealed = r.revealed,
+                    latencyMs = r.latencyMs,
+                    wrongPressCount = r.wrongPresses.size,
+                    octaveErrors = octave,
+                    neighborErrors = neighbor,
+                    otherErrors = other,
+                )
+            },
+        )
+    }
+
+    suspend fun foundationsTrials(): List<FoundationsTrialEntity> =
+        withContext(Dispatchers.IO) { db.foundationsTrialDao().all() }
+
     suspend fun getSetting(key: String): String? =
         withContext(Dispatchers.IO) { db.appSettingDao().get(key) }
 

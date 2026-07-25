@@ -148,6 +148,35 @@ data class SrsCardEntity(
     val dueAtEpochMs: Long,
 )
 
+/**
+ * One foundations prompt, logged raw (SPEC §8a): the durable asset that lets
+ * every threshold in the trainer be re-tuned later against real history.
+ * Aggregates are derived from these rows, never the other way round.
+ */
+@Entity(
+    tableName = "foundations_trials",
+    indices = [Index("atomId"), Index("dayIndex")],
+)
+data class FoundationsTrialEntity(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val atomId: String,
+    /** The atom the drill was focused on (may differ from [atomId] for padding). */
+    val focusAtomId: String,
+    val atEpochMs: Long,
+    /** Days since epoch — the spacing unit the criterion counts. */
+    val dayIndex: Int,
+    val expectedNote: Int,
+    /** Correct on the first press with no reveal: the only thing that counts. */
+    val unaided: Boolean,
+    val revealed: Boolean,
+    /** Prompt→correct-key latency in ms, or -1 when never produced. */
+    val latencyMs: Int,
+    val wrongPressCount: Int,
+    val octaveErrors: Int,
+    val neighborErrors: Int,
+    val otherErrors: Int,
+)
+
 /** Simple local key-value settings (first-run checklist state, current song, …). */
 @Entity(tableName = "app_settings")
 data class AppSettingEntity(

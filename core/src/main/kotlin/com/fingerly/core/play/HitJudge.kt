@@ -109,6 +109,20 @@ class HitJudge(
         }
     }
 
+    /**
+     * Force chart note [i] to MISSED. Used by wait mode to break out of a note
+     * the learner cannot find — without this the clock stays frozen forever and
+     * the run can never end. Idempotent.
+     */
+    fun forceMiss(i: Int) {
+        if (i < 0 || i >= noteCount || state[i] != STATE_PENDING) return
+        state[i] = STATE_MISSED
+        handMisses[hand[i]]++
+        misses++
+        combo = 0
+        while (scanFrom < noteCount && state[scanFrom] != STATE_PENDING) scanFrom++
+    }
+
     /** 0–100. Extras count against accuracy: wrong notes are not free. */
     fun accuracyPercent(): Float {
         val total = hits + misses + extras
