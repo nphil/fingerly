@@ -177,6 +177,43 @@ class MidiEngine(context: Context) {
         }
     }
 
+    // ---- recording playback (SPEC §3 before/after) --------------------------
+
+    private var playbackGeneration = 0
+
+    /** Plays a recorded attempt through the demo synth. Not the hot path. */
+    fun playRecording(
+        events: List<com.fingerly.app.data.RecordingCodec.Event>,
+        onDone: () -> Unit = {},
+    ) {
+        stopPlayback()
+        val generation = playbackGeneration
+        demoSynth.start()
+        val t0 = events.minOfOrNull { it.timeMs } ?: 0
+        for (e in events) {
+            handler.postDelayed({
+                if (playbackGeneration != generation) return@postDelayed
+                when (e.type) {
+                    com.fingerly.core.midi.MidiEvent.TYPE_NOTE_ON ->
+                        demoSynth.noteOn(e.note, e.velocity.coerceAtLeast(40))
+                    com.fingerly.core.midi.MidiEvent.TYPE_NOTE_OFF -> demoSynth.noteOff(e.note)
+                }
+            }, (e.timeMs - t0).toLong().coerceAtLeast(0))
+        }
+        val end = ((events.maxOfOrNull { it.timeMs } ?: 0) - t0).toLong() + 1200
+        handler.postDelayed({
+            if (playbackGeneration == generation) {
+                demoSynth.stop()
+                onDone()
+            }
+        }, end)
+    }
+
+    fun stopPlayback() {
+        playbackGeneration++
+        demoSynth.stop()
+    }
+
     private fun disconnect() {
         openPort?.let { port ->
             runCatching { port.disconnect(receiver) }

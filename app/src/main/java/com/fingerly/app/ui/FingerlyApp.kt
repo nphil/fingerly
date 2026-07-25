@@ -122,7 +122,10 @@ fun FingerlyApp(
                     onExit = { screen = Screen.Shell },
                 )
 
-                Screen.Dashboard -> DashboardScreen(onBack = { screen = Screen.Shell })
+                Screen.Dashboard -> DashboardScreen(
+                    engine = engine,
+                    onBack = { screen = Screen.Shell },
+                )
 
                 Screen.Library -> LibraryScreen(
                     onSongChosen = {

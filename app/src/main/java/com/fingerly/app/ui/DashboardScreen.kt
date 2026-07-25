@@ -33,12 +33,14 @@ import java.util.Locale
  * session history. No vibes, no praise (SPEC §2.8).
  */
 @Composable
-fun DashboardScreen(onBack: () -> Unit) {
+fun DashboardScreen(engine: com.fingerly.app.midi.MidiEngine, onBack: () -> Unit) {
     val context = LocalContext.current
     val repo = remember { SessionRepository(FingerlyDatabase.get(context)) }
     var report by remember { mutableStateOf<LearnerProfile.Report?>(null) }
     var sessions by remember { mutableStateOf<List<Pair<String, String>>>(emptyList()) }
     var dueCount by remember { mutableStateOf(0) }
+    var pairs by remember { mutableStateOf<List<SessionRepository.RecordingPair>>(emptyList()) }
+    var playing by remember { mutableStateOf<String?>(null) }
 
     LaunchedEffect(Unit) {
         report = LearnerProfile.analyze(repo.loadAttemptRecords())
@@ -47,6 +49,11 @@ fun DashboardScreen(onBack: () -> Unit) {
             fmt.format(Date(s.startedAtEpochMs)) to (s.finishStateLabel ?: "(unfinished)")
         }
         dueCount = repo.dueReviewCount()
+        pairs = repo.beforeAfterPairs()
+    }
+
+    androidx.compose.runtime.DisposableEffect(Unit) {
+        onDispose { engine.stopPlayback() }
     }
 
     Box(Modifier.fillMaxSize()) {
@@ -93,6 +100,26 @@ fun DashboardScreen(onBack: () -> Unit) {
                     if (weak.isNotEmpty()) {
                         Text("current focus: ${weak.joinToString(", ")}", color = Color(0xFFFFB74D))
                     }
+                }
+
+                if (pairs.isNotEmpty()) {
+                    Text("Then vs now", style = MaterialTheme.typography.titleMedium, color = Mint)
+                    pairs.forEach { pair ->
+                        Text(pair.label, color = Fg)
+                        androidx.compose.foundation.layout.Row(
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        ) {
+                            androidx.compose.material3.OutlinedButton(onClick = {
+                                playing = "${pair.label} (first)"
+                                engine.playRecording(repo.readRecording(pair.first)) { playing = null }
+                            }) { Text("Play first") }
+                            androidx.compose.material3.OutlinedButton(onClick = {
+                                playing = "${pair.label} (latest)"
+                                engine.playRecording(repo.readRecording(pair.latest)) { playing = null }
+                            }) { Text("Play latest") }
+                        }
+                    }
+                    if (playing != null) Text("playing: $playing", color = Dim)
                 }
 
                 Text("Sessions", style = MaterialTheme.typography.titleMedium, color = Mint)

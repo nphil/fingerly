@@ -58,6 +58,24 @@ class NoteHighwayView(
     /** Session mode: called once when the run completes; flow is external then. */
     var onEnded: ((HitJudge) -> Unit)? = null
 
+    /** Attempt recording (SPEC §3): pre-allocated, song-relative event log. */
+    var recordEnabled = false
+    private val recTimesMs = IntArray(REC_CAPACITY)
+    private val recTypes = ByteArray(REC_CAPACITY)
+    private val recNotes = ByteArray(REC_CAPACITY)
+    private val recVels = ByteArray(REC_CAPACITY)
+    private var recCount = 0
+
+    /** Snapshot of this run's recording; allocation happens only at run end. */
+    fun recordingBytes(): ByteArray? =
+        if (recCount == 0) {
+            null
+        } else {
+            com.fingerly.app.data.RecordingCodec.encode(
+                recCount, recTimesMs, recTypes, recNotes, recVels,
+            )
+        }
+
     /** Free-play lets a tap restart the run; session mode drives flow itself. */
     var tapToRestart = true
 
@@ -187,6 +205,7 @@ class NoteHighwayView(
                 if (event.data1 < 128) pressed[event.data1] = true
                 if (!ended) {
                     val evSongMs = (event.timestampNanos - anchorNanos) / 1_000_000 - leadInMs
+                    record(MidiEvent.TYPE_NOTE_ON, event.data1, event.data2, evSongMs)
                     val idx = judge.onNoteOn(event.data1, evSongMs)
                     if (idx >= 0) {
                         spawnBurst(noteX[event.data1], keyboardTop, HIT_BURST)
@@ -196,8 +215,23 @@ class NoteHighwayView(
                 }
             }
 
-            MidiEvent.TYPE_NOTE_OFF -> if (event.data1 < 128) pressed[event.data1] = false
+            MidiEvent.TYPE_NOTE_OFF -> {
+                if (event.data1 < 128) pressed[event.data1] = false
+                if (!ended) {
+                    val evSongMs = (event.timestampNanos - anchorNanos) / 1_000_000 - leadInMs
+                    record(MidiEvent.TYPE_NOTE_OFF, event.data1, 0, evSongMs)
+                }
+            }
         }
+    }
+
+    private fun record(type: Int, note: Int, velocity: Int, songMsAt: Long) {
+        if (!recordEnabled || recCount >= REC_CAPACITY) return
+        recTimesMs[recCount] = songMsAt.toInt()
+        recTypes[recCount] = type.toByte()
+        recNotes[recCount] = note.toByte()
+        recVels[recCount] = velocity.toByte()
+        recCount++
     }
 
     init {
@@ -235,6 +269,7 @@ class NoteHighwayView(
         worstFrameMs = 0f
         lastJudgedTotal = -1
         autoFrom = 0
+        recCount = 0
         waitFrom = 0
         waitingNow = false
         waitPromptIdx = -1
@@ -636,6 +671,7 @@ class NoteHighwayView(
         private const val AUTOPLAY_VELOCITY = 80
         private const val WARMUP_FRAMES = 12 // ~100ms @120Hz
         private const val WRONG_FLASH_NANOS = 450_000_000L
+        private const val REC_CAPACITY = 4096
         private val LETTERS =
             arrayOf("C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B")
     }

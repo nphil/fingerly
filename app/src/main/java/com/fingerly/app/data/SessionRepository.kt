@@ -182,6 +182,54 @@ class SessionRepository(private val db: FingerlyDatabase) {
             }
         }
 
+    /** Persists an attempt recording (SPEC §3). */
+    suspend fun saveRecording(
+        context: android.content.Context,
+        sessionId: Long,
+        passageDbId: Long,
+        bytes: ByteArray,
+        durationMs: Long,
+    ) = withContext(Dispatchers.IO) {
+        val dir = java.io.File(context.filesDir, "recordings").apply { mkdirs() }
+        val file = java.io.File(dir, "rec_${System.currentTimeMillis()}_$passageDbId.bin")
+        file.writeBytes(bytes)
+        db.midiRecordingDao().insert(
+            MidiRecordingEntity(
+                sessionId = sessionId,
+                passageId = passageDbId,
+                filePath = file.absolutePath,
+                recordedAtEpochMs = System.currentTimeMillis(),
+                durationMs = durationMs,
+            ),
+        )
+    }
+
+    class RecordingPair(
+        val label: String,
+        val first: MidiRecordingEntity,
+        val latest: MidiRecordingEntity,
+    )
+
+    /** Per passage with history: earliest vs latest recording (SPEC §3). */
+    suspend fun beforeAfterPairs(): List<RecordingPair> = withContext(Dispatchers.IO) {
+        val songs = db.songDao().all().associateBy { it.id }
+        db.passageDao().all().mapNotNull { p ->
+            val recs = db.midiRecordingDao().forPassage(p.id)
+            if (recs.size < 2) return@mapNotNull null
+            val song = songs[p.songId]?.title ?: "?"
+            RecordingPair(
+                label = "$song · bars ${p.startMeasure}–${p.endMeasure}",
+                first = recs.first(),
+                latest = recs.last(),
+            )
+        }
+    }
+
+    fun readRecording(entity: MidiRecordingEntity): List<RecordingCodec.Event> =
+        runCatching {
+            RecordingCodec.decode(java.io.File(entity.filePath).readBytes())
+        }.getOrElse { emptyList() }
+
     suspend fun allSongs(): List<SongEntity> =
         withContext(Dispatchers.IO) { db.songDao().all() }
 

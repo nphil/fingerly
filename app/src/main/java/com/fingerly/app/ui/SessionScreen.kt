@@ -72,6 +72,8 @@ fun SessionScreen(
     var sessionEngine by remember { mutableStateOf<SessionEngine?>(null) }
     var idMap by remember { mutableStateOf<Map<Int, Long>>(emptyMap()) }
     var sessionId by remember { mutableStateOf(0L) }
+    var lastRecording by remember { mutableStateOf<ByteArray?>(null) }
+    var lastRecordingMs by remember { mutableStateOf(0L) }
 
     LaunchedEffect(Unit) {
         val map = repo.ensureSong(score, songPath, composer, difficultyRank, passages)
@@ -123,12 +125,17 @@ fun SessionScreen(
         )
         val next = se.onAttempt(result)
         val liveProgress = se.progressFor(step.passage.id)
+        val recording = lastRecording
+        lastRecording = null
         scope.launch {
             val dbId = idMap[step.passage.id]
             if (dbId != null && liveProgress != null) {
                 repo.recordAttempt(
                     sessionId, dbId, step.setting, score.tempoBpm, result, liveProgress,
                 )
+                if (recording != null) {
+                    repo.saveRecording(context, sessionId, dbId, recording, lastRecordingMs)
+                }
             }
             RemoteLog.log(
                 "session",
@@ -177,7 +184,12 @@ fun SessionScreen(
                             leadInMs = 2000
                             waitMode = state.step.setting.wait
                             autoplay = state.listen
-                            onEnded = { judge -> onRunEnded(state.step, judge, state.listen) }
+                            recordEnabled = !state.listen
+                            onEnded = { judge ->
+                                lastRecording = recordingBytes()
+                                lastRecordingMs = (state.practice.totalSeconds * 1000).toLong()
+                                onRunEnded(state.step, judge, state.listen)
+                            }
                         }
                     },
                 )
