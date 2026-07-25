@@ -207,6 +207,30 @@ Tiered celebration architecture; vary visuals per tier so rewards don't habituat
 dropped frames at 120Hz with 200 simultaneous particles (perf test). Phase 3+ =
 each feature verified against §2 anti-patterns.
 
+### Roadmap amendment, 2026-07 (user decision): fundamentals-first
+
+Phases 1–3 shipped as written, and much of Phase 4 (FSRS, skill tagging, learner
+profile, drills, dashboard, recordings, library + MusicXML import) is built. In
+practice all of it sits idle, because the learner is blocked on basics and the
+song path is gated behind them.
+
+**Decision: complete the fundamentals module before any further breadth.** The
+module (SPEC §4a-F, below) absorbs work previously scheduled as Phase 5
+(notation) and adds rhythm, which no phase covered at all. Rationale:
+
+- Building breadth while blocked on basics produces many 80%-done systems — the
+  exact failure mode §2.7 exists to design around.
+- Notation is a *fundamental*, not a later polish item. Training key-finding by
+  letter name builds an intermediate representation that fluent readers bypass,
+  and §4 already states note names must be "optional, late, never a gate" —
+  which the current foundations trainer violates by making them the gate.
+- Rhythm has never been addressed anywhere in this spec. It is not optional.
+
+**Constraint on this decision:** the module must carry an enumerable definition
+of done (§4a-F), or "complete the fundamentals" becomes its own open-ended
+project. Deferred until it is met: bundled starter library expansion, just-in-time
+drill polish, boss chapters, the preference model (§4a), and the Phase 6 art pass.
+
 ### Out of scope (do not build)
 Accounts/cloud sync, social features, OMR scanning, audio synthesis for live play,
 iOS, phone layouts, multiple user profiles.
