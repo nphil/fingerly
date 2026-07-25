@@ -182,6 +182,9 @@ class SessionRepository(private val db: FingerlyDatabase) {
             }
         }
 
+    suspend fun allSongs(): List<SongEntity> =
+        withContext(Dispatchers.IO) { db.songDao().all() }
+
     suspend fun recentSessions(limit: Int = 10): List<PracticeSessionEntity> =
         withContext(Dispatchers.IO) { db.practiceSessionDao().recent(limit) }
 

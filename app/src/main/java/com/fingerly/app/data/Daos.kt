@@ -11,7 +11,7 @@ interface SongDao {
     @Insert
     suspend fun insert(song: SongEntity): Long
 
-    @Query("SELECT * FROM songs ORDER BY difficultyRank")
+    @Query("SELECT * FROM songs ORDER BY difficultyRank, title")
     suspend fun all(): List<SongEntity>
 
     @Query("SELECT * FROM songs WHERE id = :id")

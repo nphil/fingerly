@@ -19,10 +19,10 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.viewinterop.AndroidView
 import com.fingerly.app.latency.LatencyTestView
 import com.fingerly.app.midi.MidiEngine
-import com.fingerly.core.song.BundledSongs
+import com.fingerly.app.data.SongCatalog
 import kotlinx.coroutines.flow.StateFlow
 
-enum class Screen { Shell, Checklist, LatencyTest, VirtualPiano, Settings, Highway, Session, Dashboard }
+enum class Screen { Shell, Checklist, LatencyTest, VirtualPiano, Settings, Highway, Session, Dashboard, Library }
 
 private val DarkScheme: ColorScheme = darkColorScheme(
     primary = Color(0xFF00E676),
@@ -50,10 +50,13 @@ fun FingerlyApp(
             if (prefs.getBoolean("checklist_done", false)) Screen.Session else Screen.Checklist,
         )
     }
-    // Parse in ~ms from bundled resources; fine at first composition.
-    // Sessions teach the beginner starter; free play shows the goal piece.
-    val sessionScore = remember { BundledSongs.odeToJoyBeginner() }
-    val freePlayScore = remember { BundledSongs.gymnopedie1Excerpt() }
+    // The current song drives both sessions and free play; picked in Library.
+    var songVersion by remember { mutableStateOf(0) }
+    val currentSongPath = remember(songVersion) { SongCatalog.currentPath(prefs) }
+    val currentScore = remember(songVersion) {
+        SongCatalog.load(currentSongPath) ?: SongCatalog.bundled.first().loader()
+    }
+    val currentMeta = remember(songVersion) { SongCatalog.metaFor(currentSongPath) }
 
     // Relaunching from the launcher always lands on today's session (SPEC §1),
     // even if the activity was still alive on another screen.
@@ -79,7 +82,8 @@ fun FingerlyApp(
                     onOpenHighway = { screen = Screen.Highway },
                     onOpenSession = { screen = Screen.Session },
                     onOpenDashboard = { screen = Screen.Dashboard },
-                    songTitle = freePlayScore.title,
+                    onOpenLibrary = { screen = Screen.Library },
+                    songTitle = currentScore.title,
                 )
 
                 Screen.Checklist -> ChecklistScreen(
@@ -105,17 +109,28 @@ fun FingerlyApp(
 
                 Screen.Highway -> HighwayScreen(
                     engine = engine,
-                    score = freePlayScore,
+                    score = currentScore,
                     onBack = { screen = Screen.Shell },
                 )
 
                 Screen.Session -> SessionScreen(
                     engine = engine,
-                    score = sessionScore,
+                    score = currentScore,
+                    songPath = currentSongPath,
+                    composer = currentMeta.second,
+                    difficultyRank = currentMeta.third,
                     onExit = { screen = Screen.Shell },
                 )
 
                 Screen.Dashboard -> DashboardScreen(onBack = { screen = Screen.Shell })
+
+                Screen.Library -> LibraryScreen(
+                    onSongChosen = {
+                        songVersion++
+                        screen = Screen.Shell
+                    },
+                    onBack = { screen = Screen.Shell },
+                )
             }
         }
     }

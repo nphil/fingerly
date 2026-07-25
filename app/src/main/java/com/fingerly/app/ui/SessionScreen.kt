@@ -55,7 +55,14 @@ private sealed interface SessionUi {
  * only (SPEC §2.8); "I'm lost" always decomposes (SPEC §2.2).
  */
 @Composable
-fun SessionScreen(engine: MidiEngine, score: Score, onExit: () -> Unit) {
+fun SessionScreen(
+    engine: MidiEngine,
+    score: Score,
+    songPath: String,
+    composer: String,
+    difficultyRank: Int,
+    onExit: () -> Unit,
+) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val repo = remember { SessionRepository(FingerlyDatabase.get(context)) }
@@ -67,9 +74,7 @@ fun SessionScreen(engine: MidiEngine, score: Score, onExit: () -> Unit) {
     var sessionId by remember { mutableStateOf(0L) }
 
     LaunchedEffect(Unit) {
-        val map = repo.ensureSong(
-            score, "bundled:ode_to_joy_beginner", "Ludwig van Beethoven", 0, passages,
-        )
+        val map = repo.ensureSong(score, songPath, composer, difficultyRank, passages)
         val progress = repo.loadProgress(map)
         // §8a: the learner profile drives just-in-time drills.
         val profileReport = LearnerProfile.analyze(repo.loadAttemptRecords())

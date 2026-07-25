@@ -40,6 +40,7 @@ fun ShellScreen(
     onOpenHighway: () -> Unit,
     onOpenSession: () -> Unit,
     onOpenDashboard: () -> Unit,
+    onOpenLibrary: () -> Unit,
     songTitle: String,
 ) {
     val connection by engine.connectionState.collectAsState()
@@ -78,7 +79,8 @@ fun ShellScreen(
 
             Button(onClick = onOpenSession) { Text("Today's session") }
             OutlinedButton(onClick = onOpenDashboard) { Text("Progress") }
-            OutlinedButton(onClick = onOpenHighway) { Text("Free play: $songTitle") }
+            OutlinedButton(onClick = onOpenLibrary) { Text("Songs  ·  now: $songTitle") }
+            OutlinedButton(onClick = onOpenHighway) { Text("Free play") }
             OutlinedButton(onClick = onOpenChecklist) { Text("Setup checklist") }
             OutlinedButton(onClick = onOpenSettings) { Text("Settings") }
             OutlinedButton(onClick = onOpenVirtualPiano) { Text("Virtual piano (demo)") }

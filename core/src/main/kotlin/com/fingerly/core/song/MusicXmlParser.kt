@@ -206,6 +206,9 @@ object BundledSongs {
      */
     fun odeToJoyBeginner(): Score = load("songs/ode_to_joy_beginner.musicxml")
 
+    /** Broken-chord patterns, one hand position per bar (library #7, SPEC §5). */
+    fun bachPreludeCExcerpt(): Score = load("songs/bach_prelude_c_excerpt.musicxml")
+
     private fun load(path: String): Score =
         MusicXmlParser.parse(
             requireNotNull(
