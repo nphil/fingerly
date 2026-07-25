@@ -113,14 +113,32 @@ fun FingerlyApp(
                     onBack = { screen = Screen.Shell },
                 )
 
-                Screen.Session -> SessionScreen(
-                    engine = engine,
-                    score = currentScore,
-                    songPath = currentSongPath,
-                    composer = currentMeta.second,
-                    difficultyRank = currentMeta.third,
-                    onExit = { screen = Screen.Shell },
-                )
+                Screen.Session -> {
+                    // Foundations gate: hands-on basics before song sessions
+                    // (SPEC §2.5/§4). Completed or skipped once → songs forever.
+                    var foundationsDone by remember {
+                        mutableStateOf(
+                            prefs.getInt(PREF_FOUNDATIONS_INDEX, 0) >=
+                                com.fingerly.core.session.Foundations.lessons().size,
+                        )
+                    }
+                    if (!foundationsDone) {
+                        FoundationsScreen(
+                            engine = engine,
+                            onCompleted = { foundationsDone = true },
+                            onExit = { screen = Screen.Shell },
+                        )
+                    } else {
+                        SessionScreen(
+                            engine = engine,
+                            score = currentScore,
+                            songPath = currentSongPath,
+                            composer = currentMeta.second,
+                            difficultyRank = currentMeta.third,
+                            onExit = { screen = Screen.Shell },
+                        )
+                    }
+                }
 
                 Screen.Dashboard -> DashboardScreen(
                     engine = engine,
