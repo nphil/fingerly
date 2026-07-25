@@ -228,6 +228,42 @@ iOS, phone layouts, multiple user profiles.
 
 ---
 
+## 4a. Musical Preference Model — "score DNA" (user-directed addition, 2026-07)
+
+Motivation is a first-class learning variable (§2.6: real projects, not exercises).
+The app learns what THIS user likes and steers the curriculum toward it.
+
+**Feature extraction (deterministic, from parsed MusicXML — no ML needed):**
+per piece compute a fixed vector: tempo, mode (major/minor), note density
+(notes/sec), harmonic density (mean simultaneous notes), pitch range, mean
+register, rhythmic regularity (inter-onset-interval variance), off-beat onset
+fraction, mean melodic interval + leap fraction, chromaticism (non-scale-tone
+fraction), self-similarity/repetition across bars, hand-texture class
+(melody+accompaniment vs polyphonic).
+
+**Preference capture:** swipe/Tinder-style rating screen. Each card plays a
+representative ~20s excerpt (soundfont once §6 lands; demo synth before that).
+Like / dislike / "love" only — no sliders, no questionnaires.
+
+**Model:** online logistic regression over the standardized feature vector
+(per-feature weights, SGD update per swipe). Tiny data by design: ~12 features,
+usable after 20–40 swipes. Cold start uses uncertainty sampling — queue the
+piece that best discriminates the currently least-certain weights.
+
+**Readout (blunt, §2.8):** state preferences as measured weights, e.g.
+"minor mode +1.8, sparse texture +1.4, fast tempo −2.1 — you like slow, spare,
+minor-key writing." Never "you're a romantic soul."
+
+**Use:** rank candidate pieces by predicted preference × learnability (difficulty
+within reach of measured skill), so suggestions are songs he'd like AND could
+play soon. Feeds §4's honest difficulty estimate rather than replacing it.
+
+**Sourcing:** public-domain MusicXML (Mutopia, MuseScore community, IMSLP where
+available). Automatic scraping is out of scope; the app suggests candidates and
+the user imports via the existing MusicXML import flow (§5).
+
+---
+
 ## 8a. Learner Model (user-directed addition, 2026-07)
 
 The crux of the app: it continuously builds a profile of THIS user from every
