@@ -1,5 +1,11 @@
 # Fingerly Learning Architecture
 
+> Evidence base: **`docs/RESEARCH.md`** holds all 59 findings behind this
+> document — each with its citation, sample, effect size, and an independent
+> verifier's status (CONFIRMED / MISCHARACTERIZED), plus the ideas rejected on
+> evidence. Only CONFIRMED findings at MODERATE or STRONG strength may drive a
+> parameter change here.
+
 Two separate engines on a shared substrate. Keep this boundary: they model
 different kinds of learning and are tuned by different research.
 
