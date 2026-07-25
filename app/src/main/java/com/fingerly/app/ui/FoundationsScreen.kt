@@ -122,7 +122,12 @@ fun FoundationsScreen(engine: MidiEngine, onCompleted: () -> Unit, onExit: () ->
                 AndroidView(
                     modifier = Modifier.fillMaxSize(),
                     factory = { ctx ->
-                        NoteHighwayView(ctx, engine.ring, FoundationsTrainer.toScore(d)).apply {
+                        NoteHighwayView(
+                            ctx, engine.ring, FoundationsTrainer.toScore(d),
+                            matchAnyOctave = BooleanArray(d.prompts.size) {
+                                d.prompts[it].matchAnyOctave
+                            },
+                        ).apply {
                             tapToRestart = false
                             leadInMs = 900
                             waitMode = true

@@ -20,6 +20,13 @@ class HitJudge(
     notes: List<ChartNote>,
     private val hitWindowMs: Long = 150,
     private val missAfterMs: Long = 300,
+    /**
+     * Per-note: when true, ANY octave of the right letter counts as a hit.
+     * Used by the foundations trainer's home-octave rung, where the skill being
+     * tested is "which white key is a G", not "which G" — octave numbering is a
+     * separate, later atom. Null = exact pitch matching for every note.
+     */
+    private val matchAnyOctave: BooleanArray? = null,
 ) {
 
     val noteCount = notes.size
@@ -60,6 +67,13 @@ class HitJudge(
         handMisses.fill(0)
     }
 
+    private fun pitchMatches(i: Int, played: Int): Boolean =
+        if (matchAnyOctave != null && i < matchAnyOctave.size && matchAnyOctave[i]) {
+            played % 12 == pitch[i] % 12
+        } else {
+            played == pitch[i]
+        }
+
     /** State of chart note [i]: [STATE_PENDING], [STATE_HIT] or [STATE_MISSED]. */
     fun stateOf(i: Int): Int = state[i]
 
@@ -69,7 +83,7 @@ class HitJudge(
         var bestAbs = Long.MAX_VALUE
         var i = scanFrom
         while (i < noteCount && startMs[i] <= songMs + hitWindowMs) {
-            if (state[i] == STATE_PENDING && pitch[i] == midiNote) {
+            if (state[i] == STATE_PENDING && pitchMatches(i, midiNote)) {
                 val abs = if (startMs[i] > songMs) startMs[i] - songMs else songMs - startMs[i]
                 if (abs <= hitWindowMs && abs < bestAbs) {
                     bestAbs = abs

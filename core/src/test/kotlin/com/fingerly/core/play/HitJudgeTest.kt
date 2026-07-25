@@ -110,6 +110,42 @@ class HitJudgeTest {
     }
 
     @Test
+    fun anyOctaveModeAcceptsTheRightLetterAnywhere() {
+        // Foundations home rung: the skill is "which white key is a G", so any
+        // G must count — the learner has not been taught octave numbers yet.
+        val judge = HitJudge(
+            chart(67 to 1.0), // G4
+            matchAnyOctave = booleanArrayOf(true),
+        )
+        assertTrue(judge.onNoteOn(55, 1000) >= 0) // G3
+        assertEquals(1, judge.hits)
+        assertEquals(0, judge.extras)
+
+        val wrongLetter = HitJudge(chart(67 to 1.0), matchAnyOctave = booleanArrayOf(true))
+        assertEquals(-1, wrongLetter.onNoteOn(65, 1000)) // F is still wrong
+        assertEquals(1, wrongLetter.extras)
+    }
+
+    @Test
+    fun exactMatchingRemainsTheDefault() {
+        val judge = HitJudge(chart(67 to 1.0))
+        assertEquals(-1, judge.onNoteOn(55, 1000)) // wrong octave = wrong note
+        assertEquals(1, judge.extras)
+    }
+
+    @Test
+    fun forceMissUnblocksAStuckPrompt() {
+        val judge = HitJudge(chart(60 to 0.0, 62 to 1.0))
+        judge.forceMiss(0)
+        assertEquals(1, judge.misses)
+        assertEquals(HitJudge.STATE_MISSED, judge.stateOf(0))
+        judge.forceMiss(0) // idempotent
+        assertEquals(1, judge.misses)
+        // The next note is still hittable.
+        assertTrue(judge.onNoteOn(62, 1000) >= 0)
+    }
+
+    @Test
     fun resetClearsEverything() {
         val judge = HitJudge(chart(60 to 0.0))
         judge.onNoteOn(60, 0)

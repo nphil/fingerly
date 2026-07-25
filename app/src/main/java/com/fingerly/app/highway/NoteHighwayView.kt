@@ -40,9 +40,11 @@ class NoteHighwayView(
     /** Widened at slow practice tempos so beginners aren't punished by ±150ms. */
     hitWindowMs: Long = 150,
     missAfterMs: Long = 300,
+    /** Per-note: any octave of the letter counts (foundations home rung). */
+    matchAnyOctave: BooleanArray? = null,
 ) : View(context), Choreographer.FrameCallback {
 
-    private val judge = HitJudge(score.notes, hitWindowMs, missAfterMs)
+    private val judge = HitJudge(score.notes, hitWindowMs, missAfterMs, matchAnyOctave)
     private val notes: List<ChartNote> = score.notes
 
     /**

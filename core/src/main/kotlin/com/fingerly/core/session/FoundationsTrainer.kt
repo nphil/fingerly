@@ -170,8 +170,15 @@ class FoundationsTrainer(
     class Prompt(
         val atomId: String,
         val midiNote: Int,
-        /** What the learner is asked to produce: "F" at rung 0, "F4" beyond. */
+        /** Exactly what is being asked: "any F" at rung 0, "F4" once octaves count. */
         val label: String,
+        /**
+         * True when any octave of this letter is correct. At the home rung the
+         * skill is "which white key is an F" — the octave digit would demand a
+         * skill the octaves atom has not taught yet, so asking for it (and
+         * grading it) would be asking the learner to guess.
+         */
+        val matchAnyOctave: Boolean,
     )
 
     class Drill(
@@ -298,7 +305,10 @@ class FoundationsTrainer(
         val prompts = ordered.map { id ->
             val st = atoms.getValue(id)
             val note = defsById.getValue(id).promptNote(rng, st.rung)
-            Prompt(id, note, labelFor(note, st.rung))
+            // The octaves atom exists to test octave discrimination, so it always
+            // names and requires a specific one.
+            val anyOctave = st.rung == 0 && id != ATOM_OCTAVES
+            Prompt(id, note, labelFor(note, anyOctave), anyOctave)
         }
         return Drill(
             focusAtom = focus,
@@ -419,16 +429,18 @@ class FoundationsTrainer(
         return if (st.introShown) null else defsById.getValue(atomId).introTip
     }
 
-    private fun labelFor(midi: Int, rung: Int): String {
+    /** The prompt states its own grading rule — no guessing what is meant. */
+    private fun labelFor(midi: Int, anyOctave: Boolean): String {
         val letter = LETTERS[midi % 12]
-        // At rung 0 there is only one octave in play, so the digit is noise.
-        return if (rung == 0) letter else "$letter${midi / 12 - 1}"
+        return if (anyOctave) "any $letter" else "$letter${midi / 12 - 1}"
     }
 
     companion object {
         const val ERROR_OCTAVE = 0
         const val ERROR_NEIGHBOR = 1
         const val ERROR_OTHER = 2
+
+        const val ATOM_OCTAVES = "octaves"
 
         /** Minimum map to read any prompt; gates the song side only. */
         val SONG_GATE_ATOMS = listOf("find-C", "find-F", "find-G")
@@ -487,7 +499,7 @@ class FoundationsTrainer(
             }
             atoms.add(
                 AtomDef(
-                    "octaves", "Octave numbers",
+                    ATOM_OCTAVES, "Octave numbers",
                     "The same letter repeats every 12 keys. The number says which one: C4 is middle C, C3 is one octave lower.",
                 ) { rng, rung ->
                     val semis = intArrayOf(0, 2, 4, 5, 7, 9, 11)

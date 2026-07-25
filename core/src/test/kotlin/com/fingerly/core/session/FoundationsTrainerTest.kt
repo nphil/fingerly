@@ -37,14 +37,57 @@ class FoundationsTrainerTest {
     }
 
     @Test
-    fun rungZeroStaysInTheHomeOctaveAndPromptsDropTheOctaveDigit() {
+    fun rungZeroAsksForAnyOctaveAndSaysSo() {
         val t = FoundationsTrainer()
         val d = t.previewDrill()!!
         d.prompts.forEach { p ->
-            if (p.atomId != "octaves") {
+            if (p.atomId != FoundationsTrainer.ATOM_OCTAVES) {
                 assertTrue("note ${p.midiNote} outside home octave", p.midiNote in 60..71)
-                assertFalse("label ${p.label} leaks octave at rung 0", p.label.any { it.isDigit() })
+                // The prompt must never demand an octave digit the learner has
+                // not been taught — and must state the rule it will grade by.
+                assertTrue("label '${p.label}' should say 'any'", p.label.startsWith("any "))
+                assertFalse("label '${p.label}' leaks an octave digit", p.label.any { it.isDigit() })
+                assertTrue(p.matchAnyOctave)
             }
+        }
+    }
+
+    @Test
+    fun octavesAtomAlwaysNamesAndRequiresASpecificOctave() {
+        val t = FoundationsTrainer()
+        repeat(20) { day ->
+            val d = t.previewDrill() ?: return@repeat
+            t.startDrill(d)
+            d.prompts.filter { it.atomId == FoundationsTrainer.ATOM_OCTAVES }.forEach { p ->
+                assertFalse("octaves atom must not accept any octave", p.matchAnyOctave)
+                assertTrue("label '${p.label}' must name the octave", p.label.any { it.isDigit() })
+            }
+            t.recordResults(d.prompts.map { hit(it) }, day)
+        }
+    }
+
+    @Test
+    fun promptsDemandExactOctaveOnceTheLadderWidens() {
+        val t = FoundationsTrainer()
+        // Climb a letter atom off the home rung.
+        var guard = 0
+        while (t.atoms.getValue("find-C").rung == 0 && guard < 40) {
+            val d = t.previewDrill() ?: break
+            t.startDrill(d)
+            t.recordResults(d.prompts.map { hit(it) }, guard)
+            t.startSitting(guard + 1)
+            guard++
+        }
+        val climbed = t.atoms.entries.filter { it.value.rung > 0 }.map { it.key }
+        assertTrue("no atom climbed a rung", climbed.isNotEmpty())
+        repeat(10) { day ->
+            val d = t.previewDrill() ?: return@repeat
+            t.startDrill(d)
+            d.prompts.filter { it.atomId in climbed }.forEach { p ->
+                assertFalse("rung>0 must require the exact key", p.matchAnyOctave)
+                assertTrue("label '${p.label}' must name the octave", p.label.any { it.isDigit() })
+            }
+            t.recordResults(d.prompts.map { hit(it) }, day + 100)
         }
     }
 
