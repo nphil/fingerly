@@ -163,6 +163,31 @@ class SessionRepository(private val db: FingerlyDatabase) {
         )
     }
 
+    /** Full attempt history as §8a profile records (skills come from passage tags). */
+    suspend fun loadAttemptRecords(): List<LearnerProfile.AttemptRecord> =
+        withContext(Dispatchers.IO) {
+            val skillsByPassage = db.passageDao().all().associate { p ->
+                p.id to p.skillTags.split(',').filter { it.isNotBlank() }.toSet()
+            }
+            db.passageAttemptDao().all().map { a ->
+                LearnerProfile.AttemptRecord(
+                    skills = skillsByPassage[a.passageId] ?: emptySet(),
+                    accuracyPercent = a.accuracyPercent,
+                    meanSignedErrMs = a.meanSignedErrorMs,
+                    leftAccuracy = a.leftHandAccuracy,
+                    rightAccuracy = a.rightHandAccuracy,
+                    epochMs = a.startedAtEpochMs,
+                )
+            }
+        }
+
+    suspend fun recentSessions(limit: Int = 10): List<PracticeSessionEntity> =
+        withContext(Dispatchers.IO) { db.practiceSessionDao().recent(limit) }
+
+    suspend fun dueReviewCount(): Int = withContext(Dispatchers.IO) {
+        db.srsCardDao().due(System.currentTimeMillis()).size
+    }
+
     private fun handModeName(hand: Int): String = when (hand) {
         ChartNote.HAND_RIGHT -> "RIGHT"
         ChartNote.HAND_LEFT -> "LEFT"

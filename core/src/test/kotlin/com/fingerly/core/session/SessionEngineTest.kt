@@ -116,6 +116,48 @@ class SessionEngineTest {
     }
 
     @Test
+    fun weakSkillTriggersJustInTimeDrillWithReason() {
+        // Profile: chords measurably weak with enough data (the Gymnopédie
+        // intro passage demands chords, so the drill must fire before it).
+        val profileRecords = (1..4).map {
+            LearnerProfile.AttemptRecord(
+                skills = setOf(Decomposer.SKILL_CHORDS),
+                accuracyPercent = 55f, meanSignedErrMs = 0,
+                leftAccuracy = 55f, rightAccuracy = 60f, epochMs = it.toLong(),
+            )
+        }
+        val report = LearnerProfile.analyze(profileRecords)
+        val e = SessionEngine(passages, HashMap(), nowMs = { clock }, profile = report)
+        e.begin()
+        val step = e.onAttempt(result(90f)) // warmup done → drill precedes work
+        assertEquals(SessionEngine.Phase.DRILL, step.phase)
+        assertTrue(step.drillReason!!.contains(Decomposer.SKILL_CHORDS))
+        assertTrue(step.drillReason!!.contains("Bars"))
+        // One drill rep, then work — no drill loop.
+        val next = e.onAttempt(result(80f))
+        assertEquals(SessionEngine.Phase.WORK, next.phase)
+        assertEquals(null, next.drillReason)
+    }
+
+    @Test
+    fun noDrillWithoutProfileOrWithoutWeakness() {
+        val e = engine() // no profile at all
+        e.begin()
+        assertEquals(SessionEngine.Phase.WORK, e.onAttempt(result(90f)).phase)
+
+        val strongReport = LearnerProfile.analyze(
+            (1..4).map {
+                LearnerProfile.AttemptRecord(
+                    setOf(Decomposer.SKILL_CHORDS), 96f, 0, 95f, 97f, it.toLong(),
+                )
+            },
+        )
+        val e2 = SessionEngine(passages, HashMap(), nowMs = { clock }, profile = strongReport)
+        e2.begin()
+        assertEquals(SessionEngine.Phase.WORK, e2.onAttempt(result(90f)).phase)
+    }
+
+    @Test
     fun finishLabelNamesCleanPassOrSaysNone() {
         val e = engine()
         e.begin()

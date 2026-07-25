@@ -69,18 +69,22 @@ class SessionEngine(
     private val passages: List<Passage>,
     private val progress: MutableMap<Int, PassageProgress>,
     private val nowMs: () -> Long,
+    /** §8a learner profile; enables just-in-time drills when present. */
+    private val profile: LearnerProfile.Report? = null,
     private val warmupMs: Long = 2 * 60_000L,
     private val workMs: Long = 9 * 60_000L,
     private val reviewMs: Long = 3 * 60_000L,
 ) {
 
-    enum class Phase { WARMUP, WORK, REVIEW, VICTORY, DONE }
+    enum class Phase { WARMUP, DRILL, WORK, REVIEW, VICTORY, DONE }
 
     class Step(
         val phase: Phase,
         val passage: Passage,
         val ladderIndex: Int,
         val setting: PracticeSetting,
+        /** Why a drill exists, e.g. "Bars 5–8 needs: leaps · measured 62%" (SPEC §4). */
+        val drillReason: String? = null,
     )
 
     private var phase = Phase.WARMUP
@@ -94,6 +98,8 @@ class SessionEngine(
     private var totalAttempts = 0
     private var warmupAttempts = 0
     private var cleanStreak = 0
+    private var drillReason: String? = null
+    private var drilledPassageIds = HashSet<Int>()
 
     fun begin(): Step {
         phaseStartMs = nowMs()
@@ -142,6 +148,14 @@ class SessionEngine(
             Phase.WARMUP -> {
                 warmupAttempts++
                 if (warmupAttempts >= 1 || elapsed() >= warmupMs) enterWork()
+            }
+
+            Phase.DRILL -> {
+                // One drill rep, then the passage it exists for (SPEC §4),
+                // back at its normal resume rung.
+                drillReason = null
+                phase = Phase.WORK
+                selectWorkPassage()
             }
 
             Phase.WORK -> {
@@ -211,7 +225,8 @@ class SessionEngine(
         else -> workPassage
     }
 
-    private fun currentStep() = Step(phase, activePassage(), ladderIndex, ladder[ladderIndex])
+    private fun currentStep() =
+        Step(phase, activePassage(), ladderIndex, ladder[ladderIndex], drillReason)
 
     private fun elapsed() = nowMs() - phaseStartMs
 
@@ -222,6 +237,26 @@ class SessionEngine(
         phase = Phase.WORK
         phaseStartMs = nowMs()
         selectWorkPassage()
+        maybeStartDrill()
+    }
+
+    /**
+     * Just-in-time drill (SPEC §4): if the work passage demands a skill this
+     * learner measurably struggles with, one focused rep at an easy rung comes
+     * first — labeled with exactly why it exists. Never repeats per session.
+     */
+    private fun maybeStartDrill() {
+        val report = profile ?: return
+        if (workPassage.id in drilledPassageIds) return
+        val weak = report.weakestSkills()
+        val match = workPassage.skills.firstOrNull { it in weak } ?: return
+        val stat = report.skillStats[match] ?: return
+        drilledPassageIds.add(workPassage.id)
+        drillReason = "Bars ${workPassage.startMeasure}–${workPassage.endMeasure} " +
+            "needs: $match · you measure ${stat.ema.toInt()}% on it"
+        phase = Phase.DRILL
+        // Drill rung: the skill's content in wait mode — isolate the problem.
+        setLadderFor(workPassage, Int.MAX_VALUE)
     }
 
     /** Work target = lowest-mastery passage in difficulty order (measured weakness). */

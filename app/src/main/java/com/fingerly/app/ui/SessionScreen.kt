@@ -34,6 +34,7 @@ import com.fingerly.core.session.AttemptResult
 import com.fingerly.core.session.Decomposer
 import com.fingerly.core.session.Diagnosis
 import com.fingerly.core.session.HAND_BOTH
+import com.fingerly.core.session.LearnerProfile
 import com.fingerly.core.session.Passage
 import com.fingerly.core.session.PracticeScoreFactory
 import com.fingerly.core.session.SessionEngine
@@ -70,7 +71,13 @@ fun SessionScreen(engine: MidiEngine, score: Score, onExit: () -> Unit) {
             score, "bundled:ode_to_joy_beginner", "Ludwig van Beethoven", 0, passages,
         )
         val progress = repo.loadProgress(map)
-        val se = SessionEngine(passages, progress, nowMs = { System.currentTimeMillis() })
+        // §8a: the learner profile drives just-in-time drills.
+        val profileReport = LearnerProfile.analyze(repo.loadAttemptRecords())
+        val se = SessionEngine(
+            passages, progress,
+            nowMs = { System.currentTimeMillis() },
+            profile = profileReport,
+        )
         idMap = map
         sessionId = repo.startSession()
         sessionEngine = se
@@ -214,6 +221,9 @@ private fun BriefingContent(
                 style = MaterialTheme.typography.titleLarge,
                 color = Color(0xFF00E676),
             )
+            if (step.drillReason != null) {
+                Text(step.drillReason!!, color = Color(0xFFFFB74D))
+            }
             if (diagnostic != null) {
                 Text(diagnostic, color = Color(0xFF78828C))
             }
@@ -252,6 +262,7 @@ private fun FinishedContent(label: String, onDone: () -> Unit, onExtend: () -> U
 
 private fun phaseName(phase: SessionEngine.Phase): String = when (phase) {
     SessionEngine.Phase.WARMUP -> "Warm-up"
+    SessionEngine.Phase.DRILL -> "Drill"
     SessionEngine.Phase.WORK -> "Work"
     SessionEngine.Phase.REVIEW -> "Review"
     SessionEngine.Phase.VICTORY -> "Victory lap"

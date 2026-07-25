@@ -28,6 +28,9 @@ interface PassageDao {
 
     @Query("SELECT * FROM passages WHERE songId = :songId ORDER BY orderIndex")
     suspend fun forSong(songId: Long): List<PassageEntity>
+
+    @Query("SELECT * FROM passages")
+    suspend fun all(): List<PassageEntity>
 }
 
 @Dao
@@ -49,6 +52,9 @@ interface PassageAttemptDao {
 
     @Query("SELECT * FROM passage_attempts WHERE passageId = :passageId ORDER BY startedAtEpochMs")
     suspend fun forPassage(passageId: Long): List<PassageAttemptEntity>
+
+    @Query("SELECT * FROM passage_attempts ORDER BY startedAtEpochMs")
+    suspend fun all(): List<PassageAttemptEntity>
 }
 
 @Dao

@@ -22,7 +22,7 @@ import com.fingerly.app.midi.MidiEngine
 import com.fingerly.core.song.BundledSongs
 import kotlinx.coroutines.flow.StateFlow
 
-enum class Screen { Shell, Checklist, LatencyTest, VirtualPiano, Settings, Highway, Session }
+enum class Screen { Shell, Checklist, LatencyTest, VirtualPiano, Settings, Highway, Session, Dashboard }
 
 private val DarkScheme: ColorScheme = darkColorScheme(
     primary = Color(0xFF00E676),
@@ -78,6 +78,7 @@ fun FingerlyApp(
                     onOpenSettings = { screen = Screen.Settings },
                     onOpenHighway = { screen = Screen.Highway },
                     onOpenSession = { screen = Screen.Session },
+                    onOpenDashboard = { screen = Screen.Dashboard },
                     songTitle = freePlayScore.title,
                 )
 
@@ -113,6 +114,8 @@ fun FingerlyApp(
                     score = sessionScore,
                     onExit = { screen = Screen.Shell },
                 )
+
+                Screen.Dashboard -> DashboardScreen(onBack = { screen = Screen.Shell })
             }
         }
     }
