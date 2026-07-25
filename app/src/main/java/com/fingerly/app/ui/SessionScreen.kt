@@ -182,6 +182,12 @@ fun SessionScreen(
                         ).apply {
                             tapToRestart = false
                             leadInMs = 2000
+                            // No live evaluative HUD during real practice: it is
+                            // a per-note verdict, a loss-framed falling percent,
+                            // and a resettable streak — all three already
+                            // rejected on evidence and already off in
+                            // foundations. Diagnostics come after the rep.
+                            showHud = false
                             waitMode = state.step.setting.wait
                             autoplay = state.listen
                             recordEnabled = !state.listen

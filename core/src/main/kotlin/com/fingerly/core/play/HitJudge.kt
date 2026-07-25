@@ -147,6 +147,17 @@ class HitJudge(
     /** Mean absolute timing error of hits, in ms. */
     fun avgAbsErrorMs(): Long = if (hits == 0) 0 else sumAbsErrMs / hits
 
+    /**
+     * Fraction of chart notes this timing figure is computed from (0–1).
+     *
+     * [avgAbsErrorMs] averages over HITS only, so a run that missed everything
+     * hard and landed three easy notes reports excellent timing. Any surface
+     * showing the average must show this coverage beside it, or the number is a
+     * loss disguised as a win.
+     */
+    fun timingCoverage(): Float =
+        if (noteCount == 0) 0f else hits.toFloat() / noteCount
+
     /** Mean signed timing error of hits (+ = late, - = early), in ms. */
     fun meanSignedErrorMs(): Long = if (hits == 0) 0 else sumSignedErrMs / hits
 

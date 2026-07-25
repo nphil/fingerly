@@ -55,8 +55,12 @@ class SessionEngineTest {
     fun lowAccuracyStepsEasierHighStepsHarder() {
         val e = engine()
         e.begin()
-        var step = e.onAttempt(result(90f)) // → WORK
+        var step = e.onAttempt(result(90f)) // → WORK, at the ladder floor
+        // Climb off the floor so "one rung easier" is actually reachable.
+        step = e.onAttempt(result(97f))
+        step = e.onAttempt(result(97f))
         val startIndex = step.ladderIndex
+        assertTrue("expected to climb off the floor", startIndex < 10)
 
         step = e.onAttempt(result(60f)) // struggling: one rung easier
         assertEquals(startIndex + 1, step.ladderIndex)
@@ -65,6 +69,67 @@ class SessionEngineTest {
         assertEquals(startIndex + 1, step.ladderIndex)
         step = e.onAttempt(result(97f)) // second consecutive clean: promote
         assertEquals(startIndex, step.ladderIndex)
+    }
+
+    @Test
+    fun workProceedsInSongOrderNotDifficultyOrder() {
+        // The 80% cliff was a scheduling property: consuming passages
+        // easiest-first made the remaining work monotonically harder.
+        val e = engine()
+        e.begin()
+        var step = e.onAttempt(result(90f))
+        val firstWork = step.passage
+        assertEquals(
+            "work must start at the beginning of the song",
+            passages.minOf { it.startMeasure },
+            firstWork.startMeasure,
+        )
+    }
+
+    @Test
+    fun oneLuckyRepCannotClearAPassage() {
+        val progress = HashMap<Int, PassageProgress>()
+        val pr = PassageProgress()
+        progress[0] = pr
+        pr.record(result(90f), ladderIndex = 3)
+        assertEquals(
+            "a single clean rep must not bank a rung",
+            Int.MAX_VALUE, pr.bestCleanIndex,
+        )
+        pr.record(result(90f), ladderIndex = 3)
+        assertEquals(3, pr.bestCleanIndex)
+    }
+
+    @Test
+    fun ledgerCountsClearedPassagesAndCompletionIsReachable() {
+        val e = engine()
+        e.begin()
+        assertEquals(0, e.ledger().cleared)
+        assertEquals(passages.size, e.ledger().total)
+        assertTrue(!e.ledger().complete)
+
+        // Clear everything at the declared finish line (both hands, slow).
+        for (p in passages) {
+            val pr = PassageProgress()
+            pr.record(result(95f), PassageProgress.SESSION_TARGET_INDEX)
+            pr.record(result(95f), PassageProgress.SESSION_TARGET_INDEX)
+            assertTrue(pr.bestCleanIndex <= PassageProgress.SESSION_TARGET_INDEX)
+        }
+    }
+
+    @Test
+    fun extensionsAreCountedAndSurfaced() {
+        val e = engine()
+        e.begin()
+        e.onAttempt(result(90f))
+        clock += 10 * 60_000L
+        e.onAttempt(result(88f))
+        e.onAttempt(result(95f)) // → DONE
+        assertEquals(SessionEngine.Phase.DONE, e.current().phase)
+        e.extend()
+        clock += 5 * 60_000L
+        val label = e.finishLabel()
+        assertTrue("extensions must be surfaced, not hidden", label.contains("extension"))
     }
 
     @Test

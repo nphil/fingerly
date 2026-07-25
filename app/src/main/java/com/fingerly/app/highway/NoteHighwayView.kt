@@ -115,6 +115,8 @@ class NoteHighwayView(
 
     private var revealedIdx = -1
     private val revealedFlag = BooleanArray(notes.size)
+    private val twoGroupOffsets = intArrayOf(1, 3)
+    private val threeGroupOffsets = intArrayOf(6, 8, 10)
 
     /** True when prompt [i] was revealed or force-advanced — not unaided. */
     fun wasRevealedAt(i: Int): Boolean = i < revealedFlag.size && revealedFlag[i]
@@ -184,6 +186,7 @@ class NoteHighwayView(
 
     // --- frame stats ---
     private var lastFrameNanos = 0L
+    private var lastParticleNanos = 0L
     private var frameIntervalNanos = 8_333_333L
     private var warmupFrames = 0 // skip stats while >0: screen transitions jank
     private var droppedFrames = 0
@@ -490,7 +493,17 @@ class NoteHighwayView(
             }
         }
 
-        updateParticles(frameIntervalNanos / 1_000_000_000f)
+        // Measured delta, not the nominal refresh period: using the nominal
+        // value made bursts play in slow motion exactly when frames were being
+        // dropped — i.e. when the artifact is most visible. Clamped to 2 frames
+        // so a stall cannot teleport particles.
+        val dtNanos = if (lastParticleNanos == 0L) {
+            frameIntervalNanos
+        } else {
+            (frameTimeNanos - lastParticleNanos).coerceIn(0L, frameIntervalNanos * 2)
+        }
+        lastParticleNanos = frameTimeNanos
+        updateParticles(dtNanos / 1_000_000_000f)
         if (perfTestMode && particleCount < PERF_TARGET_PARTICLES) {
             spawnBurst(
                 x = whiteKeyWidth + random.nextFloat() * (width - 2 * whiteKeyWidth),
@@ -652,7 +665,9 @@ class NoteHighwayView(
     private fun markLandmarkGroup(midi: Int) {
         val octaveBase = (midi / 12) * 12
         val inTwoGroup = (midi % 12) <= 4 // C, C#, D, D#, E
-        val offsets = if (inTwoGroup) intArrayOf(1, 3) else intArrayOf(6, 8, 10)
+        // Pre-allocated: this runs inside drawNotes, and any per-frame
+        // allocation in the render loop is a bug (SPEC §1).
+        val offsets = if (inTwoGroup) twoGroupOffsets else threeGroupOffsets
         for (off in offsets) {
             val n = octaveBase + off
             if (n in lowNote..highNote) keyDue[n] = 3 // landmark tint
@@ -769,7 +784,10 @@ class NoteHighwayView(
         endLine2.append("hit ").append(judge.hits)
             .append("  miss ").append(judge.misses)
             .append("  extra ").append(judge.extras)
-            .append("  avg err ").append(judge.avgAbsErrorMs()).append("ms")
+            // Coverage stated: the average is over hits only, so it must never
+            // be readable as "your timing was great" after a run of misses.
+            .append("  avg err ").append(judge.avgAbsErrorMs()).append("ms over ")
+            .append(judge.hits).append('/').append(judge.noteCount)
             .append("  best combo ").append(judge.bestCombo)
             .append("  — tap to restart")
     }

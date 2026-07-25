@@ -29,13 +29,31 @@ class PassageProgress(
     var fsrsDifficulty: Double = 0.0,
     var lastReviewMs: Long = 0L,
 ) {
+    /** Consecutive clean reps at [pendingCleanIndex]; two are required to bank it. */
+    var pendingCleanIndex: Int = Int.MAX_VALUE
+    var pendingCleanCount: Int = 0
+
     fun record(result: AttemptResult, ladderIndex: Int) {
         attempts++
         emaAccuracy = ema(emaAccuracy, result.accuracyPercent)
         if (result.leftAccuracy >= 0) leftEma = ema(leftEma, result.leftAccuracy)
         if (result.rightAccuracy >= 0) rightEma = ema(rightEma, result.rightAccuracy)
-        if (result.accuracyPercent >= AutoDifficulty.CLEAN_AT && ladderIndex < bestCleanIndex) {
-            bestCleanIndex = ladderIndex
+        // Banking a rung permanently retires this passage from the work queue,
+        // so it must not be purchasable with one lucky rep: require two clean
+        // reps at the same rung. (Promotion already required two; clearing did
+        // not, which let a single 85% at half tempo mark a passage done.)
+        if (result.accuracyPercent >= AutoDifficulty.CLEAN_AT) {
+            if (ladderIndex == pendingCleanIndex) {
+                pendingCleanCount++
+            } else {
+                pendingCleanIndex = ladderIndex
+                pendingCleanCount = 1
+            }
+            if (pendingCleanCount >= CLEAN_REPS_TO_BANK && ladderIndex < bestCleanIndex) {
+                bestCleanIndex = ladderIndex
+            }
+        } else if (ladderIndex == pendingCleanIndex) {
+            pendingCleanCount = 0
         }
     }
 
@@ -54,6 +72,9 @@ class PassageProgress(
     companion object {
         /** Session goal rung: clean at ≤ this index counts as today's mastery. */
         const val SESSION_TARGET_INDEX = 3 // both hands, slow (see AutoDifficulty.ladder)
+
+        /** Clean reps at one rung needed before that rung is banked. */
+        const val CLEAN_REPS_TO_BANK = 2
     }
 }
 
@@ -100,9 +121,12 @@ class SessionEngine(
     private var cleanStreak = 0
     private var drillReason: String? = null
     private var drilledPassageIds = HashSet<Int>()
+    private var sittingStartMs = 0L
+    private var bestCleanRung = Int.MAX_VALUE
 
     fun begin(): Step {
         phaseStartMs = nowMs()
+        sittingStartMs = phaseStartMs
         // Warm-up: known material if any, else the easiest passage, at a rung
         // guaranteed to be comfortable. Zero decisions (SPEC §3).
         val warm = passages.minByOrNull { p ->
@@ -141,7 +165,7 @@ class SessionEngine(
         pr.intervalDays = Fsrs.intervalDays(card)
         pr.dueAtMs = now + (pr.intervalDays * 86_400_000.0).toLong()
         if (result.accuracyPercent >= AutoDifficulty.CLEAN_AT) {
-            recordFinishCandidate(activePassage(), ladder[ladderIndex])
+            recordFinishCandidate(activePassage(), ladder[ladderIndex], ladderIndex)
         }
 
         when (phase) {
@@ -201,9 +225,15 @@ class SessionEngine(
         return currentStep()
     }
 
-    /** Optional "keep going?" after the finish state (SPEC §3). */
+    /**
+     * Optional "keep going?" after the finish state (SPEC §3). Counted, because
+     * an unbounded extend button in front of a shrinking completion count is the
+     * one genuine compulsion surface here (ADHD raises problematic-gaming risk).
+     * The count and the wall-clock overrun are reported, never hidden.
+     */
     fun extend(): Step {
         if (phase == Phase.DONE) {
+            extensions++
             phase = Phase.WORK
             phaseStartMs = nowMs()
             selectWorkPassage()
@@ -212,11 +242,55 @@ class SessionEngine(
     }
 
     /** The hard, named finish state (SPEC §3). Blunt, metric, no cheerleading. */
-    fun finishLabel(): String =
-        bestCleanLabel ?: "$totalAttempts reps logged. No clean pass today."
+    fun finishLabel(): String {
+        val led = ledger()
+        val base = bestCleanLabel
+            ?: "$totalAttempts reps logged. No clean pass today. " +
+            "${led.cleared} of ${led.total} passages."
+        val overrun = if (extensions > 0) {
+            "  ·  +$extensions extension${if (extensions > 1) "s" else ""}, " +
+                "${elapsedSittingMs() / 60_000}min total"
+        } else {
+            ""
+        }
+        val done = when {
+            led.completeAtTempo -> "  ·  SONG COMPLETE at performance tempo"
+            led.complete -> "  ·  SONG COMPLETE — every passage clean. " +
+                "Performance tempo is a separate ladder."
+            else -> ""
+        }
+        return base + done + overrun
+    }
 
     /** Live learning state for persistence. */
     fun progressFor(passageId: Int): PassageProgress? = progress[passageId]
+
+    /**
+     * How much of the song is finished, as a finite count (SPEC §4a/§2.7).
+     * [cleared] counts passages clean at [PassageProgress.SESSION_TARGET_INDEX] —
+     * the declared finish line, which is reachable in weeks. [atTempo] counts the
+     * separate, also-named achievement of performance tempo, so "complete" is
+     * never a euphemism for "played everything slowly".
+     */
+    class Ledger(val cleared: Int, val atTempo: Int, val total: Int) {
+        val complete: Boolean get() = cleared >= total && total > 0
+        val completeAtTempo: Boolean get() = atTempo >= total && total > 0
+    }
+
+    fun ledger(): Ledger = Ledger(
+        cleared = passages.count {
+            progressOf(it).bestCleanIndex <= PassageProgress.SESSION_TARGET_INDEX
+        },
+        atTempo = passages.count { progressOf(it).bestCleanIndex <= 0 },
+        total = passages.size,
+    )
+
+    /** Times "keep going" was used this sitting — surfaced, never hidden. */
+    var extensions = 0
+        private set
+
+    /** Wall-clock ms since the sitting began; the honest overrun signal. */
+    fun elapsedSittingMs(): Long = nowMs() - sittingStartMs
 
     // ------------------------------------------------------------------ internals
 
@@ -259,11 +333,34 @@ class SessionEngine(
         setLadderFor(workPassage, Int.MAX_VALUE)
     }
 
-    /** Work target = lowest-mastery passage in difficulty order (measured weakness). */
+    /**
+     * Work target: the next un-cleared passage in SONG ORDER, with difficulty as
+     * a local tiebreak only.
+     *
+     * This used to consume passages strictly easiest-first by difficultyRank,
+     * which made the remaining work monotonically harder as the song filled in —
+     * the last 20% was, by construction, the hardest 20%. That is the 80% cliff
+     * as a scheduling property rather than a personality trait (SPEC §2.7).
+     * Front-to-back keeps marginal cost roughly flat across the song, lets the
+     * piece be learned as music rather than as a difficulty-sorted list, and
+     * makes SPEC §2.7's positional boss chapter coherent.
+     */
     private fun selectWorkPassage() {
-        val target = passages.sortedBy { it.difficultyRank }.firstOrNull { p ->
+        val remaining = passages.filter { p ->
             progressOf(p).bestCleanIndex > PassageProgress.SESSION_TARGET_INDEX
-        } ?: passages.minByOrNull { progressOf(it).emaAccuracy } ?: passages.first()
+        }
+        val target = if (remaining.isNotEmpty()) {
+            // Song order; among passages starting in the same measure, easier first.
+            remaining.minWithOrNull(
+                compareBy({ it.startMeasure }, { it.difficultyRank }),
+            )!!
+        } else {
+            // Song complete at criterion. Keep working the optional tempo ladder
+            // on whatever is furthest from performance tempo, rather than
+            // grinding one passage forever.
+            passages.maxByOrNull { progressOf(it).bestCleanIndex }
+                ?: passages.first()
+        }
         workPassage = target
         val pr = progressOf(target)
         setLadderFor(
@@ -332,15 +429,21 @@ class SessionEngine(
         }
     }
 
-    private fun recordFinishCandidate(p: Passage, s: PracticeSetting) {
+    private fun recordFinishCandidate(p: Passage, s: PracticeSetting, ladderIndex: Int) {
         val hand = when (s.hand) {
             ChartNote.HAND_RIGHT -> "right hand"
             ChartNote.HAND_LEFT -> "left hand"
             else -> "both hands"
         }
-        // Keep the most impressive clean pass of the session as the finish state.
+        // Keep the BEST clean pass of the session, not the last one. This
+        // overwrote unconditionally, so the finish state reported whatever
+        // happened to come last — often an easier rung than the day's best.
+        if (ladderIndex > bestCleanRung) return
+        bestCleanRung = ladderIndex
+        val led = ledger()
         bestCleanLabel = "Bars ${p.startMeasure}–${p.startMeasure + s.bars - 1} · $hand · " +
-            "${(s.tempoMultiplier * 100).toInt()}% tempo · clean ✓"
+            "${(s.tempoMultiplier * 100).toInt()}% tempo · clean ✓ · " +
+            "${led.cleared} of ${led.total} passages"
     }
 }
 
@@ -360,7 +463,7 @@ object Diagnosis {
             issues.add("left hand ${result.leftAccuracy.toInt()}% vs right ${result.rightAccuracy.toInt()}%")
         }
         return if (issues.isEmpty()) {
-            "Clean. ${result.hits}/${result.hits} notes, avg err ${result.avgAbsErrMs}ms."
+            "Clean. ${result.hits} notes, avg err ${result.avgAbsErrMs}ms."
         } else {
             issues.joinToString(" · ")
         }

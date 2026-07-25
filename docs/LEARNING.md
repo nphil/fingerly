@@ -1,10 +1,35 @@
 # Fingerly Learning Architecture
 
-> Evidence base: **`docs/RESEARCH.md`** holds all 59 findings behind this
-> document — each with its citation, sample, effect size, and an independent
-> verifier's status (CONFIRMED / MISCHARACTERIZED), plus the ideas rejected on
-> evidence. Only CONFIRMED findings at MODERATE or STRONG strength may drive a
-> parameter change here.
+> Evidence base: **`docs/RESEARCH.md`** (59 findings — ADHD, music learning,
+> reinforcement) and **`docs/RESEARCH-GAMIFICATION.md`** (70 findings — game
+> engagement mechanics, game feel, dark patterns, educational gamification).
+> Each finding carries its citation, sample, effect size and an independent
+> verifier's status. Only CONFIRMED findings at MODERATE or STRONG strength may
+> drive a parameter change here.
+
+## The 80% cliff is a scheduling property, not a personality trait
+
+The single most useful thing either research pass produced. `SessionEngine`
+used to select work as *the lowest-mastery passage in difficulty order*, so
+passages were consumed easiest-first and the remaining work became
+monotonically harder as the song filled in — the last 20% was, by
+construction, the hardest 20%. Combined with an invisible denominator (no
+"N of M passages" existed anywhere) and a song-completion reward sitting at
+maximum delay-discount distance, that is precisely the shape that produces
+abandonment near the end.
+
+Fixes, shipped together:
+- **Work proceeds in song order**, difficulty as a local tiebreak only. Marginal
+  cost is now roughly flat across the song, the piece is learned as music, and
+  SPEC §2.7's positional boss chapter becomes coherent.
+- **A reachable finish line.** "Song complete" = every passage clean at
+  `SESSION_TARGET_INDEX` (both hands, 55% tempo) — weeks away, not years.
+  Performance tempo is a *separate named achievement*, never framed as
+  unfinished business, so completion cannot be gamed by playing everything slowly.
+- **Two clean reps to bank a rung.** One lucky 85% used to retire a passage
+  permanently, which meant the laziest strategy that satisfied the completion
+  metric was scraping 85% once per passage at half tempo.
+- **A completion event**, so a finished song stops re-serving itself forever.
 
 Two separate engines on a shared substrate. Keep this boundary: they model
 different kinds of learning and are tuned by different research.
@@ -146,6 +171,16 @@ Design choices from ADHD research that DID survive:
   feedback (basics gap); ladder restructured to single-axis steps after log
   analysis showed multi-axis promotion cliffs; promotion requires two
   consecutive clean reps after observed promote/fail ping-pong.
+- 2026-07 (gamification review): 70-finding review of game engagement mechanics
+  reconciled against the ADHD record. Net result was mostly *deletions and
+  scheduling fixes*, not added reward layers — consistent with Sailer & Homner
+  2020, where gamification's cognitive effect survives methodological rigour
+  while the motivational effect does not. Shipped: song-order work selection
+  (the 80% cliff), reachable finish line, two-clean-reps-to-bank, extension
+  counting, live HUD removed from real practice, honest timing coverage, and
+  two hot-path defects fixed. Streaks, variable-ratio celebration, hidden
+  rubber-banding, energy systems, loot-box reveal ceremony and screen shake on
+  the reading surface were all rejected — see RESEARCH-GAMIFICATION.md.
 - 2026-07 (evidence review): foundations rebuilt as a recall test after a
   literature review found the drill was measuring visual tracking, not recall.
   Counted criterion replaced the degenerate EMA estimator; octave ladder added;
