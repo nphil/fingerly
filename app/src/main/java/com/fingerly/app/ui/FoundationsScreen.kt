@@ -253,6 +253,9 @@ fun FoundationsScreen(engine: MidiEngine, onCompleted: () -> Unit, onExit: () ->
                             promptDemo = BooleanArray(d.prompts.size) {
                                 d.prompts[it].demonstrate
                             }
+                            promptScaffold = FloatArray(d.prompts.size) {
+                                d.prompts[it].scaffoldAlpha
+                            }
                             onEnded = { onDrillEnded(this, d) }
                         }
                     },

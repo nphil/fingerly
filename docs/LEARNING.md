@@ -117,6 +117,41 @@ strength and the other dimmed. The middle-C tip says "the line between the two
 staves"; drawing one staff made that sentence refer to nothing, which is worse
 than saying nothing.
 
+### The scaffold is a continuum that must reach zero (F2)
+
+`Prompt.demonstrate` was a one-shot boolean: shown on first sighting, gone
+forever after. That is a cliff, not a fade, and it left condition 4 of the
+definition of done — "no atom is above `scaffoldAlpha = 0` at the time of the
+read" — with nothing to evaluate, because no such number existed outside the
+docs.
+
+`AtomStats.scaffoldAlpha` is now that number: 1 = full help, 0 = none, and it
+drives every aid there is. At 1 the answer is shown outright. Below 1 the reveal
+arrives proportionally sooner than the configured hold. At 0 nothing is shown at
+all — no reveal, no landmark tint, and not even the middle-C dot, which was
+drawn unconditionally and would otherwise have made condition 4 permanently
+unsatisfiable.
+
+Two rules keep the fade honest:
+- It moves **only on unaided success**. Handing help back after a failure makes
+  the scaffold a reward for getting things wrong, and the fade would never
+  terminate.
+- `mastered()` requires `scaffoldAlpha <= 0`. An atom cannot be certified while
+  the app is still helping with it — which was exactly the defect that let the
+  old trainer certify visual tracking.
+
+### The span: read every position the excerpts actually use
+
+Three landmarks are anchors, not a vocabulary. The cold-read excerpts use
+fifteen diatonic positions across G2–G4, and a unit test asserts that every
+pitch appearing in any excerpt is one the `span-read` atom trains — so the
+falsification check can never be run against material the module never taught.
+
+Clef follows the pitch rather than a coin flip: below middle C reads in bass,
+above it in treble, exactly as it will in the excerpts. Middle C alone keeps its
+alternation, because being the same line from either side is the whole reason it
+is the anchor.
+
 ### Onboarding is a demonstration, not an explanation
 
 §2 forbids every conventional option: no theory prerequisites, no text over

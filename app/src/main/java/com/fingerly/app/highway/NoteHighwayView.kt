@@ -128,6 +128,27 @@ class NoteHighwayView(
     var promptDemo: BooleanArray? = null
 
     /**
+     * Per-prompt scaffold level, 1 = full help, 0 = none (SPEC §4a-F item F2).
+     * Drives every aid there is: how soon the answer is revealed, whether the
+     * landmark tint appears at all, and whether the middle-C dot is drawn.
+     * At zero the screen shows the notation and nothing else, which is what
+     * condition 4 of the definition of done requires.
+     */
+    var promptScaffold: FloatArray? = null
+
+    private fun scaffoldOf(i: Int): Float {
+        val a = promptScaffold ?: return 1f
+        return if (i in a.indices) a[i] else 1f
+    }
+
+    /** Reveal delay for prompt [i]; negative means never reveal. */
+    private fun revealDelayFor(i: Int): Long {
+        val alpha = scaffoldOf(i)
+        if (alpha <= 0f) return -1L
+        return (revealAfterMs * (1f - alpha)).toLong()
+    }
+
+    /**
      * Cold-read mode (SPEC §4a-F item F3): the excerpt is drawn as notation and
      * NOTHING else is shown — no falling notes, no lit keys, no landmark tint,
      * no reveal. The clock does not wait, because condition 3 of the definition
@@ -155,6 +176,16 @@ class NoteHighwayView(
     private fun clefOf(i: Int): Int {
         val c = promptClef ?: return 0
         return if (i in c.indices) c[i].toInt() else 0
+    }
+
+    private fun anyScaffoldLeft(): Boolean {
+        val a = promptScaffold ?: return true
+        var i = 0
+        while (i < a.size) {
+            if (a[i] > 0f) return true
+            i++
+        }
+        return false
     }
 
     /** Suppress the live accuracy/miss/extra/combo HUD (evaluative verdict). */
@@ -536,8 +567,9 @@ class NoteHighwayView(
                 // Corrective feedback comes AFTER the retrieval attempt: hold the
                 // answer back, then show the black-key landmark (Rowland 2014).
                 val heldMs = (frameTimeNanos - clampStartNanos) / 1_000_000
-                if (clampStartNanos != 0L && revealAfterMs > 0 && heldMs >= revealAfterMs &&
-                    revealedIdx != waitFrom
+                val revealAt = revealDelayFor(waitFrom)
+                if (clampStartNanos != 0L && revealAfterMs > 0 && revealAt >= 0 &&
+                    heldMs >= revealAt && revealedIdx != waitFrom
                 ) {
                     revealedIdx = waitFrom
                     if (waitFrom < revealedFlag.size) revealedFlag[waitFrom] = true
@@ -670,7 +702,8 @@ class NoteHighwayView(
                 (!recallMode || revealedFlag[i])
             ) {
                 keyDue[n.midiNote] = n.hand + 1
-                if (recallMode) markLandmarkGroup(n.midiNote)
+                // The landmark tint is help, so it goes when help goes.
+                if (recallMode && scaffoldOf(i) > 0f) markLandmarkGroup(n.midiNote)
             }
             var top = keyboardTop - endIn * pps
             var bottom = keyboardTop - startIn * pps
@@ -736,7 +769,9 @@ class NoteHighwayView(
                 canvas.drawText(label, noteX[n] - paint.measureText(label) / 2f, labelY, paint)
                 if (n == 60) canvas.drawCircle(noteX[n], labelY - 34f, 7f, middleCPaint)
             }
-        } else {
+        } else if (anyScaffoldLeft()) {
+            // The middle-C dot is the last scaffold standing. It goes too, or
+            // condition 4 can never be satisfied.
             canvas.drawCircle(noteX[60], labelY - 34f, 7f, middleCPaint)
         }
     }

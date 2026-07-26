@@ -349,7 +349,7 @@ class FoundationsTrainerTest {
         val ids = FoundationsTrainer().atoms.keys
         assertFalse(ids.contains("rh-position"))
         assertFalse(ids.contains("lh-position"))
-        assertEquals(11, ids.size) // 7 letters + octave numbers + 3 staff landmarks
+        assertEquals(12, ids.size) // 3 landmarks + span + 7 letters + octaves
     }
 
     @Test
@@ -357,7 +357,7 @@ class FoundationsTrainerTest {
         val t = FoundationsTrainer()
         perfectDrill(t, day = 0)
         val rows = t.masteryRows()
-        assertEquals(11, rows.size)
+        assertEquals(12, rows.size)
         rows.forEach { row ->
             assertTrue(row.hitsWanted > 0)
             assertEquals(t.config.criterionDays, row.daysWanted)
@@ -551,5 +551,120 @@ class FoundationsTrainerTest {
         )
         assertEquals(0, t.atoms.getValue(d.focusAtom).totalHits())
         assertEquals(0, t.atoms.getValue(d.focusAtom).daysCredited)
+    }
+
+    // ------------------------------------------------ SPEC §4a-F item F2: fade
+
+    @Test
+    fun scaffoldStartsFullAndReachesZeroOnUnaidedSuccess() {
+        val t = FoundationsTrainer()
+        val id = FoundationsTrainer.ATOM_LANDMARK_C4
+        val st = t.atoms.getValue(id)
+        assertEquals(1f, st.scaffoldAlpha, 1e-6f)
+        val p = FoundationsTrainer.Prompt(id, 60, "", false, FoundationsTrainer.RENDER_STAFF)
+        repeat(3) { t.recordResults(listOf(hit(p)), dayIndex = it) }
+        assertEquals("three clean reps must retire the scaffold", 0f, st.scaffoldAlpha, 1e-6f)
+    }
+
+    @Test
+    fun failingNeverHandsHelpBack() {
+        // A scaffold that returns on failure rewards getting things wrong, and
+        // the fade would never terminate.
+        val t = FoundationsTrainer()
+        val id = FoundationsTrainer.ATOM_LANDMARK_G4
+        val st = t.atoms.getValue(id)
+        val p = FoundationsTrainer.Prompt(id, 67, "", false, FoundationsTrainer.RENDER_STAFF)
+        t.recordResults(listOf(hit(p)), dayIndex = 0)
+        val after = st.scaffoldAlpha
+        assertTrue(after < 1f)
+        repeat(5) { t.recordResults(listOf(missWith(p, listOf(65))), dayIndex = 1) }
+        assertEquals("help must never come back", after, st.scaffoldAlpha, 1e-6f)
+    }
+
+    @Test
+    fun masteryCannotBeClaimedWhileHelpIsStillOnScreen() {
+        // Condition 4 of the definition of done.
+        val t = FoundationsTrainer()
+        val id = FoundationsTrainer.ATOM_LANDMARK_F3
+        val st = t.atoms.getValue(id)
+        // Force everything EXCEPT the scaffold.
+        repeat(t.config.sessionCriterionHits) { st.hitsAtRung[0]++ }
+        st.daysCredited = t.config.criterionDays
+        st.scaffoldAlpha = 0.2f
+        assertTrue(st.atCriterion())
+        assertFalse("help still showing — not mastered", st.mastered())
+        st.scaffoldAlpha = 0f
+        assertTrue(st.mastered())
+    }
+
+    @Test
+    fun onlyAFullyScaffoldedPromptDemonstrates() {
+        val t = FoundationsTrainer()
+        val first = t.previewDrill()!!
+        assertTrue(first.prompts.any { it.demonstrate })
+        // Fade every atom, then no prompt may show its answer outright.
+        t.atoms.values.forEach { it.scaffoldAlpha = 0f }
+        val later = t.previewDrill()!!
+        assertTrue("faded atoms must not demonstrate", later.prompts.none { it.demonstrate })
+        assertTrue(later.prompts.all { it.scaffoldAlpha == 0f })
+    }
+
+    @Test
+    fun scaffoldSurvivesSerializationAndOldBlobsDegradeSafely() {
+        val t = FoundationsTrainer()
+        val id = FoundationsTrainer.ATOM_LANDMARK_C4
+        val p = FoundationsTrainer.Prompt(id, 60, "", false, FoundationsTrainer.RENDER_STAFF)
+        t.recordResults(listOf(hit(p)), dayIndex = 0)
+        val alpha = t.atoms.getValue(id).scaffoldAlpha
+        val restored = FoundationsTrainer(t.serialize())
+        assertEquals(alpha, restored.atoms.getValue(id).scaffoldAlpha, 1e-6f)
+
+        // A blob written before the field existed: an atom with history has
+        // already earned its fade, an untouched one has not.
+        // Exactly the 14 fields the format had before scaffoldAlpha was added.
+        val legacy = "$id=3,0,0,0,0,0,0,0:0:1:0:0:1:0:4:3:0.0:0.0:0.0:1:4"
+        val old = FoundationsTrainer(legacy)
+        assertEquals(0f, old.atoms.getValue(id).scaffoldAlpha, 1e-6f)
+    }
+
+    // -------------------------------------------- SPEC §4a-F item F2: the span
+
+    @Test
+    fun theSpanAtomCoversEveryPitchTheColdReadUses() {
+        val span = FoundationsTrainer.SPAN_PITCHES.toSet()
+        for (e in com.fingerly.core.notation.ExcerptBank.all) {
+            for (n in e.notes) {
+                assertTrue(
+                    "${e.id}: ${n.midi} is read but never trained",
+                    span.contains(n.midi),
+                )
+            }
+        }
+    }
+
+    @Test
+    fun spanPromptsUseTheClefRealNotationWouldUse() {
+        val t = FoundationsTrainer()
+        val defs = FoundationsTrainer.defaultAtoms()
+            .filter { it.id == FoundationsTrainer.ATOM_SPAN }
+        val only = FoundationsTrainer(atomDefs = defs)
+        var sawBass = false
+        var sawTreble = false
+        repeat(30) {
+            val d = only.previewDrill() ?: return@repeat
+            for (p in d.prompts) {
+                assertEquals(FoundationsTrainer.RENDER_STAFF, p.render)
+                if (p.midiNote < 60) {
+                    assertEquals("${p.midiNote} must read in bass", Staff.CLEF_BASS, p.clef)
+                    sawBass = true
+                } else if (p.midiNote > 60) {
+                    assertEquals("${p.midiNote} must read in treble", Staff.CLEF_TREBLE, p.clef)
+                    sawTreble = true
+                }
+            }
+            only.startDrill(d)
+        }
+        assertTrue("the span must exercise both clefs", sawBass && sawTreble)
+        assertTrue(t.atoms.containsKey(FoundationsTrainer.ATOM_SPAN))
     }
 }

@@ -111,6 +111,23 @@ class FoundationsTrainer(
         /** Total prompts ever seen — for honest "no data yet" reporting. */
         var promptsSeen = 0
 
+        /**
+         * How much help this atom still gets, 1 = full, 0 = none (SPEC §4a-F
+         * item F2, condition 4 of the definition of done).
+         *
+         * Replaces the one-shot demonstrate flag with a continuum, because
+         * "shown once, then never again" is a cliff rather than a fade, and the
+         * definition of done requires every atom to be at zero before the module
+         * can be claimed. It drives every scaffold there is: whether the answer
+         * is shown outright, how long the reveal is withheld, and whether the
+         * landmark tint appears at all.
+         *
+         * It only ever decreases, and only on unaided success — help is never
+         * handed back for failing, which would make the scaffold a reward for
+         * getting things wrong.
+         */
+        var scaffoldAlpha = 1f
+
         /** Unaided hits banked at rung ≥ 1 (evidence beyond the home octave). */
         fun hitsBeyondHomeOctave(): Int =
             (1 until hitsAtRung.size).sumOf { hitsAtRung[it] }
@@ -127,7 +144,9 @@ class FoundationsTrainer(
         fun mastered(): Boolean =
             atCriterion() &&
                 (maxRung == 0 || hitsBeyondHomeOctave() >= 1) &&
-                daysCredited >= config.criterionDays
+                daysCredited >= config.criterionDays &&
+                // Condition 4: nothing counts while a scaffold is still showing.
+                scaffoldAlpha <= 0f
 
         /** How many more unaided hits are wanted in this sitting, 0 when done. */
         fun hitsWantedToday(): Int =
@@ -137,7 +156,7 @@ class FoundationsTrainer(
                 (config.sessionCriterionHits - totalHits()).coerceAtLeast(0)
             }
 
-        fun recordPrompt(unaided: Boolean, dayIndex: Int, seq: Int) {
+        fun recordPrompt(unaided: Boolean, dayIndex: Int, seq: Int, fadeStep: Float = 0.34f) {
             promptsSeen++
             promptsAtRung++
             lastPromptedDay = dayIndex
@@ -146,6 +165,10 @@ class FoundationsTrainer(
                 unaidedAtRung++
                 hitsAtRung[rung.coerceIn(0, hitsAtRung.size - 1)]++
                 todayHits++
+                // Fade only on unaided success. Never restore it on failure:
+                // handing help back for a miss makes the scaffold a reward for
+                // getting things wrong, and the fade would never terminate.
+                scaffoldAlpha = (scaffoldAlpha - fadeStep).coerceAtLeast(0f)
             }
         }
 
@@ -165,7 +188,7 @@ class FoundationsTrainer(
             todayHits, daysCredited, lastCreditedDay, lastPromptedDay, lastPromptedSeq,
             rung, promptsAtRung, unaidedAtRung,
             octaveRate, neighborRate, otherRate,
-            if (introShown) 1 else 0, promptsSeen,
+            if (introShown) 1 else 0, promptsSeen, scaffoldAlpha,
         ).joinToString(":")
 
         companion object {
@@ -188,6 +211,10 @@ class FoundationsTrainer(
                 otherRate = p[11].toFloatOrNull() ?: 0f
                 introShown = p[12] == "1"
                 promptsSeen = p[13].toIntOrNull() ?: 0
+                // Field added after the first release: older blobs are shorter,
+                // and an atom with history has already earned some fade.
+                scaffoldAlpha = p.getOrNull(14)?.toFloatOrNull()
+                    ?: if (promptsSeen > 0) 0f else 1f
             }
         }
     }
@@ -223,6 +250,8 @@ class FoundationsTrainer(
          * which is scaffolding and fading rather than instruction.
          */
         val demonstrate: Boolean = false,
+        /** How much help this prompt carries; 0 is what "done" requires. */
+        val scaffoldAlpha: Float = 1f,
     )
 
     class Drill(
@@ -366,12 +395,15 @@ class FoundationsTrainer(
             val anyOctave =
                 st.rung == 0 && st.maxRung > 0 && id != ATOM_OCTAVES &&
                     def.render != RENDER_STAFF
-            val clef = when (def.clef) {
+            val clef = when {
+                def.clef != Staff.CLEF_EITHER -> def.clef
                 // Middle C's whole point is that it is the SAME ledger line from
                 // either side, so its prompt must arrive from either side.
-                Staff.CLEF_EITHER ->
-                    if (rng.nextBoolean()) Staff.CLEF_TREBLE else Staff.CLEF_BASS
-                else -> def.clef
+                note == 60 -> if (rng.nextBoolean()) Staff.CLEF_TREBLE else Staff.CLEF_BASS
+                // Everything else reads in the clef real notation would use, so
+                // the skill transfers to the excerpts rather than to a variant.
+                note < 60 -> Staff.CLEF_BASS
+                else -> Staff.CLEF_TREBLE
             }
             Prompt(
                 atomId = id,
@@ -380,7 +412,10 @@ class FoundationsTrainer(
                 matchAnyOctave = anyOctave,
                 render = def.render,
                 clef = clef,
-                demonstrate = st.promptsSeen == 0 && demoed.add(id),
+                // Full scaffold means show the answer outright. Partial means
+                // reveal sooner than usual. Zero means nothing at all.
+                demonstrate = st.scaffoldAlpha >= 1f && demoed.add(id),
+                scaffoldAlpha = st.scaffoldAlpha,
             )
         }
         return Drill(
@@ -537,12 +572,24 @@ class FoundationsTrainer(
         /** Prompt is a notated pitch on a five-line staff, with no words. */
         const val RENDER_STAFF = 1
 
+        const val ATOM_SPAN = "span-read"
         const val ATOM_LANDMARK_C4 = "landmark-c4"
         const val ATOM_LANDMARK_G4 = "landmark-g4"
         const val ATOM_LANDMARK_F3 = "landmark-f3"
 
         /** The three anchors every other staff position is measured against. */
         val LANDMARK_ATOMS = listOf(ATOM_LANDMARK_C4, ATOM_LANDMARK_G4, ATOM_LANDMARK_F3)
+
+        /**
+         * Every diatonic position the cold-read excerpts actually use, G2–G4.
+         * The landmarks teach three anchors; this teaches reading the rest by
+         * their distance from one, which is what the excerpts demand.
+         */
+        val SPAN_PITCHES = intArrayOf(
+            43, 45, 47, // G2 A2 B2
+            48, 50, 52, 53, 55, 57, 59, // C3 D3 E3 F3 G3 A3 B3
+            60, 62, 64, 65, 67, // C4 D4 E4 F4 G4
+        )
 
         val LETTERS = arrayOf("C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B")
         val LETTER_SEMITONE = mapOf(
@@ -616,6 +663,18 @@ class FoundationsTrainer(
                     "The bass clef's two dots straddle one line: that line is F, the fourth white key below middle C.",
                     render = RENDER_STAFF, clef = Staff.CLEF_BASS, maxRung = 0,
                 ) { _, _ -> 53 },
+            )
+            // Reading the whole span (SPEC §4a-F item F2). Same task as a
+            // landmark — read a notated pitch, play it — with the simplified
+            // axis widened from "one of three fixed pitches" to "any position
+            // the excerpts use". Clef follows the pitch, as it does in real
+            // notation: below middle C reads in bass.
+            atoms.add(
+                AtomDef(
+                    ATOM_SPAN, "Read any note",
+                    "Every other note is counted from a landmark: one line up from middle C is E, one space down from the treble G is F.",
+                    render = RENDER_STAFF, clef = Staff.CLEF_EITHER, maxRung = 0,
+                ) { rng, _ -> SPAN_PITCHES[rng.nextInt(SPAN_PITCHES.size)] },
             )
             // Letter-name key finding: the scaffold UNDER the staff prompts, not
             // the goal (SPEC §4: names are optional, late, never a gate).
