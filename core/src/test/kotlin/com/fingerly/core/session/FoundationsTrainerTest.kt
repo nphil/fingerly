@@ -349,7 +349,7 @@ class FoundationsTrainerTest {
         val ids = FoundationsTrainer().atoms.keys
         assertFalse(ids.contains("rh-position"))
         assertFalse(ids.contains("lh-position"))
-        assertEquals(12, ids.size) // 3 landmarks + span + 7 letters + octaves
+        assertEquals(13, ids.size) // 3 landmarks + span + hands + 7 letters + octaves
     }
 
     @Test
@@ -357,7 +357,7 @@ class FoundationsTrainerTest {
         val t = FoundationsTrainer()
         perfectDrill(t, day = 0)
         val rows = t.masteryRows()
-        assertEquals(12, rows.size)
+        assertEquals(13, rows.size)
         rows.forEach { row ->
             assertTrue(row.hitsWanted > 0)
             assertEquals(t.config.criterionDays, row.daysWanted)
@@ -666,5 +666,76 @@ class FoundationsTrainerTest {
         }
         assertTrue("the span must exercise both clefs", sawBass && sawTreble)
         assertTrue(t.atoms.containsKey(FoundationsTrainer.ATOM_SPAN))
+    }
+
+    // ---------------------------------------------- SPEC §4a-F item F5: hands
+
+    @Test
+    fun handsTogetherPairsAreAlwaysSeparablyFarApart() {
+        val rng = kotlin.random.Random(7)
+        for (right in FoundationsTrainer.HANDS_RIGHT_POOL) {
+            repeat(20) {
+                val left = FoundationsTrainer.pairFor(right, rng)
+                assertTrue("no legal partner for $right", left >= 0)
+                assertTrue(
+                    "$right over $left is only ${right - left} semitones",
+                    right - left >=
+                        com.fingerly.core.notation.ExcerptBank.MIN_HAND_SEPARATION_SEMITONES,
+                )
+            }
+        }
+    }
+
+    @Test
+    fun oneHandCannotSatisfyAHandsTogetherPrompt() {
+        // Both notes are due at the same instant, so wait mode holds until both
+        // land. If only one chart note were emitted the atom would certify a
+        // skill MIDI cannot observe — the fingering-atom mistake.
+        val p = FoundationsTrainer.Prompt(
+            FoundationsTrainer.ATOM_HANDS, 67, "", false,
+            FoundationsTrainer.RENDER_STAFF, Staff.CLEF_EITHER, secondNote = 48,
+        )
+        assertTrue(p.handsTogether)
+        val drill = FoundationsTrainer.Drill("x", "x", null, listOf(p))
+        val score = FoundationsTrainer.toScore(drill)
+        assertEquals(2, score.notes.size)
+        assertEquals(score.notes[0].startSeconds, score.notes[1].startSeconds, 1e-9)
+        assertEquals(48, score.notes[0].midiNote)
+        assertEquals(67, score.notes[1].midiNote)
+    }
+
+    @Test
+    fun promptIndicesStillMapToChartNotesWhenPromptsEmitPairs() {
+        // Every per-prompt measurement is keyed by CHART index, so the moment a
+        // prompt can emit two notes the two stop being interchangeable.
+        val single = FoundationsTrainer.Prompt("a", 60, "", false)
+        val pair = FoundationsTrainer.Prompt(
+            FoundationsTrainer.ATOM_HANDS, 67, "", false,
+            FoundationsTrainer.RENDER_STAFF, Staff.CLEF_EITHER, secondNote = 48,
+        )
+        val drill = FoundationsTrainer.Drill("x", "x", null, listOf(single, pair, single))
+        val starts = FoundationsTrainer.promptChartStarts(drill)
+        assertEquals(listOf(0, 1, 3), starts.toList())
+        assertEquals(4, FoundationsTrainer.toScore(drill).notes.size)
+        assertEquals(1, FoundationsTrainer.chartNotesPerPrompt(single))
+        assertEquals(2, FoundationsTrainer.chartNotesPerPrompt(pair))
+    }
+
+    @Test
+    fun everyServedHandsPromptIsAGenuinePair() {
+        val defs = FoundationsTrainer.defaultAtoms()
+            .filter { it.id == FoundationsTrainer.ATOM_HANDS }
+        val t = FoundationsTrainer(atomDefs = defs)
+        repeat(15) {
+            val d = t.previewDrill() ?: return@repeat
+            for (p in d.prompts) {
+                assertTrue("hands prompt served as a single note", p.handsTogether)
+                assertTrue(
+                    p.midiNote - p.secondNote >=
+                        com.fingerly.core.notation.ExcerptBank.MIN_HAND_SEPARATION_SEMITONES,
+                )
+            }
+            t.startDrill(d)
+        }
     }
 }

@@ -91,23 +91,33 @@ fun FoundationsScreen(engine: MidiEngine, onCompleted: () -> Unit, onExit: () ->
             wrongByIdx.getOrPut(view.wrongExpectedIdxAt(k)) { ArrayList() }
                 .add(view.wrongPlayedNoteAt(k))
         }
+        // A hands-together prompt emits TWO chart notes, so prompt index and
+        // chart index stopped being interchangeable — and every per-prompt
+        // measurement is keyed by chart index.
+        val starts = FoundationsTrainer.promptChartStarts(d)
         val results = d.prompts.mapIndexed { i, p ->
-            val demonstrated = view.wasDemonstratedAt(i)
+            val at = starts[i]
+            val span = FoundationsTrainer.chartNotesPerPrompt(p)
+            val demonstrated = (at until at + span).any { view.wasDemonstratedAt(it) }
             // A demonstration also sets the reveal flag (both withhold credit),
             // but only a reveal the LEARNER ran out of time on is a retrieval
             // failure. Conflating them made a flawless first drill — where every
             // atom is met for the first time — report as half wrong.
-            val revealed = view.wasRevealedAt(i) && !demonstrated
-            val latency = view.waitLatencyMsAt(i)
+            val revealed = (at until at + span).any { view.wasRevealedAt(it) } && !demonstrated
+            // Slowest of the pair: a hands-together prompt is not done until
+            // BOTH notes have landed.
+            val latency = (at until at + span).map { view.waitLatencyMsAt(it) }
+                .let { if (it.any { l -> l < 0 }) -1 else it.max() }
+            val wrong = (at until at + span).flatMap { wrongByIdx[it] ?: emptyList() }
             FoundationsTrainer.PromptResult(
                 atomId = p.atomId,
-                // Unaided = first press correct AND nothing was shown.
-                unaided = wrongByIdx[i].isNullOrEmpty() && !revealed &&
-                    !demonstrated && latency >= 0,
+                // Unaided = every note of this prompt landed first time, with
+                // nothing shown.
+                unaided = wrong.isEmpty() && !revealed && !demonstrated && latency >= 0,
                 revealed = revealed,
                 latencyMs = latency,
                 expectedNote = p.midiNote,
-                wrongPresses = wrongByIdx[i] ?: emptyList(),
+                wrongPresses = wrong,
                 demonstrated = demonstrated,
             )
         }
@@ -229,10 +239,20 @@ fun FoundationsScreen(engine: MidiEngine, onCompleted: () -> Unit, onExit: () ->
                 AndroidView(
                     modifier = Modifier.fillMaxSize(),
                     factory = { ctx ->
+                        val chartScore = FoundationsTrainer.toScore(d)
+                        val chartStarts = FoundationsTrainer.promptChartStarts(d)
+                        // Chart-note index → the prompt that produced it.
+                        val ownerOf = IntArray(chartScore.notes.size)
+                        d.prompts.forEachIndexed { pi, p ->
+                            val from = chartStarts[pi]
+                            repeat(FoundationsTrainer.chartNotesPerPrompt(p)) {
+                                if (from + it < ownerOf.size) ownerOf[from + it] = pi
+                            }
+                        }
                         NoteHighwayView(
-                            ctx, engine.ring, FoundationsTrainer.toScore(d),
-                            matchAnyOctave = BooleanArray(d.prompts.size) {
-                                d.prompts[it].matchAnyOctave
+                            ctx, engine.ring, chartScore,
+                            matchAnyOctave = BooleanArray(chartScore.notes.size) {
+                                d.prompts[ownerOf[it]].matchAnyOctave
                             },
                         ).apply {
                             tapToRestart = false
@@ -242,19 +262,19 @@ fun FoundationsScreen(engine: MidiEngine, onCompleted: () -> Unit, onExit: () ->
                             showHud = false // no live verdict, no streak
                             revealAfterMs = t.config.revealAfterMs
                             forceAdvanceAfterMs = t.config.forceAdvanceAfterMs
-                            promptLabels = Array(d.prompts.size) { d.prompts[it].label }
+                            promptLabels = Array(chartScore.notes.size) { d.prompts[ownerOf[it]].label }
                             // Staff prompts (SPEC §4a-F): notation instead of words.
-                            promptRender = ByteArray(d.prompts.size) {
-                                d.prompts[it].render.toByte()
+                            promptRender = ByteArray(chartScore.notes.size) {
+                                d.prompts[ownerOf[it]].render.toByte()
                             }
-                            promptClef = ByteArray(d.prompts.size) {
-                                d.prompts[it].clef.toByte()
+                            promptClef = ByteArray(chartScore.notes.size) {
+                                d.prompts[ownerOf[it]].clef.toByte()
                             }
-                            promptDemo = BooleanArray(d.prompts.size) {
-                                d.prompts[it].demonstrate
+                            promptDemo = BooleanArray(chartScore.notes.size) {
+                                d.prompts[ownerOf[it]].demonstrate
                             }
-                            promptScaffold = FloatArray(d.prompts.size) {
-                                d.prompts[it].scaffoldAlpha
+                            promptScaffold = FloatArray(chartScore.notes.size) {
+                                d.prompts[ownerOf[it]].scaffoldAlpha
                             }
                             onEnded = { onDrillEnded(this, d) }
                         }

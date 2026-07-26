@@ -201,6 +201,13 @@ class NoteHighwayView(
      * first drill read as half wrong.
      */
     private val demonstratedFlag = BooleanArray(notes.size)
+    // Scratch for drawing a stacked prompt (SPEC §4a-F item F5). Pre-allocated:
+    // this is used inside onDraw and the hot path may not allocate.
+    private val chordMidi = IntArray(4)
+    private val chordStarts = DoubleArray(4)
+    private val chordDurs = DoubleArray(4)
+    private val chordClefs = ByteArray(4)
+
     private val twoGroupOffsets = intArrayOf(1, 3)
     private val threeGroupOffsets = intArrayOf(6, 8, 10)
 
@@ -896,16 +903,46 @@ class NoteHighwayView(
      */
     private fun drawStaffPrompt(canvas: Canvas, i: Int) {
         val renderer = staffRenderer ?: return
-        renderer.draw(
+        // Everything due at this instant belongs to one prompt. A hands-together
+        // prompt is two notes stacked on the grand staff, and drawing only the
+        // one the judge happens to be waiting on would pose half a question.
+        val at = notes[i].startSeconds
+        var lo = i
+        while (lo > 0 && notes[lo - 1].startSeconds == at) lo--
+        var n = 0
+        var k = lo
+        while (k < notes.size && notes[k].startSeconds == at && n < chordMidi.size) {
+            chordMidi[n] = notes[k].midiNote
+            chordStarts[n] = 0.0
+            chordDurs[n] = 4.0
+            chordClefs[n] = clefOf(k).toByte()
+            n++
+            k++
+        }
+        if (n <= 1) {
+            renderer.draw(
+                canvas = canvas,
+                midi = notes[i].midiNote,
+                clef = clefOf(i),
+                centerX = width * 0.5f,
+                // Middle C sits at the centre of the grand staff, which spans
+                // ten staff spaces — the space is smaller than one staff needed.
+                midiCenterY = keyboardTop * 0.48f,
+                staffSpace = keyboardTop * 0.042f,
+                staffWidth = width * 0.32f,
+            )
+            return
+        }
+        renderer.drawExcerpt(
             canvas = canvas,
-            midi = notes[i].midiNote,
-            clef = clefOf(i),
+            midi = chordMidi, startBeats = chordStarts, durationBeats = chordDurs,
+            clefs = chordClefs, count = n,
+            totalBeats = 4.0, beatsPerBar = 4,
             centerX = width * 0.5f,
-            // Middle C sits at the centre of the grand staff, which spans ten
-            // staff spaces — so the space is smaller than a single staff needed.
             midiCenterY = keyboardTop * 0.48f,
             staffSpace = keyboardTop * 0.042f,
-            staffWidth = width * 0.32f,
+            staffWidth = width * 0.42f,
+            cursor = -1,
         )
     }
 

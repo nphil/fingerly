@@ -252,7 +252,17 @@ class FoundationsTrainer(
         val demonstrate: Boolean = false,
         /** How much help this prompt carries; 0 is what "done" requires. */
         val scaffoldAlpha: Float = 1f,
-    )
+        /**
+         * Second pitch sounding at the same instant, or -1 for a single note
+         * (SPEC §4a-F item F5). Only ever set at least
+         * [com.fingerly.core.notation.ExcerptBank.MIN_HAND_SEPARATION_SEMITONES]
+         * away from [midiNote]: MIDI carries pitch, not hands, so a closer pair
+         * could have been played with one hand and evidences nothing.
+         */
+        val secondNote: Int = -1,
+    ) {
+        val handsTogether: Boolean get() = secondNote >= 0
+    }
 
     class Drill(
         val focusAtom: String,
@@ -408,6 +418,7 @@ class FoundationsTrainer(
             Prompt(
                 atomId = id,
                 midiNote = note,
+                secondNote = if (id == ATOM_HANDS) pairFor(note, rng) else -1,
                 label = if (def.render == RENDER_STAFF) "" else labelFor(note, anyOctave),
                 matchAnyOctave = anyOctave,
                 render = def.render,
@@ -573,6 +584,7 @@ class FoundationsTrainer(
         const val RENDER_STAFF = 1
 
         const val ATOM_SPAN = "span-read"
+        const val ATOM_HANDS = "hands-together"
         const val ATOM_LANDMARK_C4 = "landmark-c4"
         const val ATOM_LANDMARK_G4 = "landmark-g4"
         const val ATOM_LANDMARK_F3 = "landmark-f3"
@@ -595,6 +607,23 @@ class FoundationsTrainer(
         val LETTER_SEMITONE = mapOf(
             "C" to 0, "D" to 2, "E" to 4, "F" to 5, "G" to 7, "A" to 9, "B" to 11,
         )
+
+        /**
+         * Right-hand pitches for the hands-together atom, and the left-hand
+         * pool beneath them. Every legal pairing is at least
+         * MIN_HAND_SEPARATION_SEMITONES apart — see [pairFor], which enforces it
+         * rather than trusting the pools.
+         */
+        val HANDS_RIGHT_POOL = intArrayOf(62, 64, 65, 67) // D4 E4 F4 G4
+        val HANDS_LEFT_POOL = intArrayOf(43, 45, 47, 48) // G2 A2 B2 C3
+
+        /** A left-hand partner for [right], or -1 if none is far enough away. */
+        fun pairFor(right: Int, rng: Random): Int {
+            val legal = HANDS_LEFT_POOL.filter {
+                right - it >= com.fingerly.core.notation.ExcerptBank.MIN_HAND_SEPARATION_SEMITONES
+            }
+            return if (legal.isEmpty()) -1 else legal[rng.nextInt(legal.size)]
+        }
 
         /** Octave pools by rung: home octave, then below, then above. */
         private val RUNG_BASES = intArrayOf(60, 48, 72)
@@ -676,6 +705,17 @@ class FoundationsTrainer(
                     render = RENDER_STAFF, clef = Staff.CLEF_EITHER, maxRung = 0,
                 ) { rng, _ -> SPAN_PITCHES[rng.nextInt(SPAN_PITCHES.size)] },
             )
+            // Hands together (SPEC §4a-F item F5). Still the whole task — read
+            // a notated thing, play it — with the simplified axis being "how
+            // many notes at once": two, and no rhythm to track. The pair is
+            // always far enough apart to be separately observable.
+            atoms.add(
+                AtomDef(
+                    ATOM_HANDS, "Both hands at once",
+                    "Two notes stacked on the grand staff sound together: the lower one is the left hand, the upper one the right.",
+                    render = RENDER_STAFF, clef = Staff.CLEF_EITHER, maxRung = 0,
+                ) { rng, _ -> HANDS_RIGHT_POOL[rng.nextInt(HANDS_RIGHT_POOL.size)] },
+            )
             // Letter-name key finding: the scaffold UNDER the staff prompts, not
             // the goal (SPEC §4: names are optional, late, never a gate).
             for ((letter, tip, semitone) in letters) {
@@ -705,16 +745,51 @@ class FoundationsTrainer(
          * is drawn between prompts, so long gaps are just dead screen.
          */
         fun toScore(drill: Drill, spacingSec: Double = 0.4): Score {
-            val notes = drill.prompts.mapIndexed { i, p ->
-                ChartNote(
-                    midiNote = p.midiNote,
-                    startSeconds = i * spacingSec,
-                    durationSeconds = 0.3,
-                    hand = if (p.midiNote < 60) ChartNote.HAND_LEFT else ChartNote.HAND_RIGHT,
-                    measure = i + 1,
+            val notes = ArrayList<ChartNote>(drill.prompts.size + 4)
+            drill.prompts.forEachIndexed { i, p ->
+                notes.add(
+                    ChartNote(
+                        midiNote = p.midiNote,
+                        startSeconds = i * spacingSec,
+                        durationSeconds = 0.3,
+                        hand = if (p.midiNote < 60) ChartNote.HAND_LEFT else ChartNote.HAND_RIGHT,
+                        measure = i + 1,
+                    ),
                 )
+                // A hands-together prompt is TWO chart notes at the same instant.
+                // Wait mode clamps until every note due at that instant is hit,
+                // so one hand alone can never satisfy it.
+                if (p.secondNote >= 0) {
+                    notes.add(
+                        ChartNote(
+                            midiNote = p.secondNote,
+                            startSeconds = i * spacingSec,
+                            durationSeconds = 0.3,
+                            hand = ChartNote.HAND_LEFT,
+                            measure = i + 1,
+                        ),
+                    )
+                }
             }
-            return Score(drill.title, notes, 60.0, 4, notes.size * spacingSec)
+            notes.sortWith(compareBy({ it.startSeconds }, { it.midiNote }))
+            return Score(drill.title, notes, 60.0, 4, drill.prompts.size * spacingSec)
         }
+
+        /**
+         * First chart-note index for each prompt. A hands-together prompt emits
+         * TWO chart notes, so prompt index and chart index stopped being the
+         * same thing — and every per-prompt measurement (reveal, latency, wrong
+         * presses) is keyed by chart index.
+         */
+        fun promptChartStarts(drill: Drill): IntArray {
+            var idx = 0
+            return IntArray(drill.prompts.size) { i ->
+                val at = idx
+                idx += chartNotesPerPrompt(drill.prompts[i])
+                at
+            }
+        }
+
+        fun chartNotesPerPrompt(p: Prompt): Int = if (p.secondNote >= 0) 2 else 1
     }
 }

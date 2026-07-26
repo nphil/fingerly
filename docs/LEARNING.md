@@ -152,6 +152,25 @@ above it in treble, exactly as it will in the excerpts. Middle C alone keeps its
 alternation, because being the same line from either side is the whole reason it
 is the anchor.
 
+### Hands together, and why one hand cannot fake it (F5)
+
+The simplified axis here is "how many notes at once" — two — with no rhythm to
+track and no sequence to remember. Both notes are emitted as chart notes at the
+**same instant**, so wait mode holds until both have landed; a prompt cannot be
+retired by playing half of it.
+
+The pair is always at least 14 semitones apart, enforced by `pairFor` rather
+than trusted to the pitch pools. MIDI carries pitch, not hands: a closer pair
+could have been played with one hand, and certifying that would repeat exactly
+the mistake that deleted the fingering atoms.
+
+One consequence worth remembering: **prompt index and chart index are no longer
+the same number.** Every per-prompt measurement — reveal, latency, wrong presses,
+scaffold level — is keyed by chart index, so `promptChartStarts` maps between
+them and the drill screen scores the whole block. A hands-together prompt's
+latency is the slower of the two notes, because it is not finished until both
+have arrived.
+
 ### Onboarding is a demonstration, not an explanation
 
 §2 forbids every conventional option: no theory prerequisites, no text over
