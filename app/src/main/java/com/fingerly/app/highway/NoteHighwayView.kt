@@ -120,6 +120,13 @@ class NoteHighwayView(
     /** Per-prompt clef for staff prompts; ignored for worded ones. */
     var promptClef: ByteArray? = null
 
+    /**
+     * Prompts that SHOW their answer from the instant they arrive — the first
+     * time the learner meets a symbol, it is demonstrated rather than tested.
+     * Scored as revealed, so a demonstration earns nothing.
+     */
+    var promptDemo: BooleanArray? = null
+
     /** Built lazily on the first staff prompt so text-only runs never load a font. */
     private var staffRenderer: StaffRenderer? = null
 
@@ -486,6 +493,12 @@ class NoteHighwayView(
                     clampStartNanos = frameTimeNanos
                     waitPrompt.setLength(0)
                     waitPrompt.append("Press ").append(promptLabelAt(waitFrom))
+                    // A never-seen symbol is demonstrated, not tested: the answer
+                    // is up immediately and the prompt earns nothing.
+                    if (promptDemo?.getOrNull(waitFrom) == true) {
+                        revealedIdx = waitFrom
+                        if (waitFrom < revealedFlag.size) revealedFlag[waitFrom] = true
+                    }
                 }
                 // Corrective feedback comes AFTER the retrieval attempt: hold the
                 // answer back, then show the black-key landmark (Rowland 2014).
@@ -787,9 +800,11 @@ class NoteHighwayView(
             midi = notes[i].midiNote,
             clef = clefOf(i),
             centerX = width * 0.5f,
-            centerY = keyboardTop * 0.45f,
-            staffSpace = keyboardTop * 0.055f,
-            staffWidth = width * 0.30f,
+            // Middle C sits at the centre of the grand staff, which spans ten
+            // staff spaces — so the space is smaller than a single staff needed.
+            midiCenterY = keyboardTop * 0.48f,
+            staffSpace = keyboardTop * 0.042f,
+            staffWidth = width * 0.32f,
         )
     }
 

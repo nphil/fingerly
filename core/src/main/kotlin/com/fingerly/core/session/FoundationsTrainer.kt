@@ -212,6 +212,17 @@ class FoundationsTrainer(
         val render: Int = RENDER_TEXT,
         /** Resolved clef — never [Staff.CLEF_EITHER]; the drill has picked one. */
         val clef: Int = Staff.CLEF_TREBLE,
+        /**
+         * The learner has never seen this atom, so the first prompt SHOWS the
+         * answer: the key lights, the landmark lights, they copy it. It is
+         * scored as revealed, so it earns nothing.
+         *
+         * This is the onboarding. §2 rules out the alternatives — no theory
+         * prerequisite, no wall of text, no menu before playing — so the way to
+         * teach a new symbol is to demonstrate it once and then withhold it,
+         * which is scaffolding and fading rather than instruction.
+         */
+        val demonstrate: Boolean = false,
     )
 
     class Drill(
@@ -341,6 +352,9 @@ class FoundationsTrainer(
             if (pad.isNotEmpty()) ids.add(pad[i % pad.size])
         }
         val ordered = spaceOut(ids, config.minGapBetweenSameAtom, rng)
+        // Only the FIRST prompt of a never-seen atom demonstrates; every later
+        // one in the same drill is a real retrieval attempt.
+        val demoed = HashSet<String>()
         val prompts = ordered.map { id ->
             val st = atoms.getValue(id)
             val def = defsById.getValue(id)
@@ -364,6 +378,7 @@ class FoundationsTrainer(
                 matchAnyOctave = anyOctave,
                 render = def.render,
                 clef = clef,
+                demonstrate = st.promptsSeen == 0 && demoed.add(id),
             )
         }
         return Drill(

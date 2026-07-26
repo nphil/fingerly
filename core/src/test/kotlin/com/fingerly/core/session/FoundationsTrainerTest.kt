@@ -476,4 +476,60 @@ class FoundationsTrainerTest {
             notated > d.prompts.size / 2,
         )
     }
+
+    @Test
+    fun aNeverSeenSymbolIsDemonstratedOnceThenTested() {
+        // The onboarding: §2 forbids theory prerequisites, walls of text and
+        // menus before playing, so a new symbol is taught by showing the answer
+        // once. It is scored as revealed, so it earns nothing.
+        val t = FoundationsTrainer()
+        val d = t.previewDrill()!!
+        val focus = d.focusAtom
+        val focusPrompts = d.prompts.filter { it.atomId == focus }
+        assertTrue(focusPrompts.size > 1)
+        assertTrue("the first meeting must demonstrate", focusPrompts.first().demonstrate)
+        assertTrue(
+            "only the first one demonstrates",
+            focusPrompts.drop(1).none { it.demonstrate },
+        )
+    }
+
+    @Test
+    fun aSeenSymbolIsNeverDemonstratedAgain() {
+        val t = FoundationsTrainer()
+        val d = t.previewDrill()!!
+        t.startDrill(d)
+        t.recordResults(d.prompts.map { hit(it) }, dayIndex = 0)
+        for (day in 1..6) {
+            t.startSitting(day)
+            val next = t.previewDrill() ?: continue
+            next.prompts.forEach { p ->
+                if (t.atoms.getValue(p.atomId).promptsSeen > 0) {
+                    assertFalse("${p.atomId} re-demonstrated", p.demonstrate)
+                }
+            }
+            t.startDrill(next)
+            t.recordResults(next.prompts.map { hit(it) }, dayIndex = day)
+        }
+    }
+
+    @Test
+    fun demonstrationsCannotBankAHit() {
+        // Belt and braces on the scoring rule: a revealed prompt is not unaided,
+        // so a drill made entirely of demonstrations banks nothing.
+        val t = FoundationsTrainer()
+        val d = t.previewDrill()!!
+        t.startDrill(d)
+        t.recordResults(
+            d.prompts.map {
+                FoundationsTrainer.PromptResult(
+                    it.atomId, unaided = false, revealed = true,
+                    latencyMs = 1200, expectedNote = it.midiNote, wrongPresses = emptyList(),
+                )
+            },
+            dayIndex = 0,
+        )
+        assertEquals(0, t.atoms.getValue(d.focusAtom).totalHits())
+        assertEquals(0, t.atoms.getValue(d.focusAtom).daysCredited)
+    }
 }

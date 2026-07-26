@@ -111,7 +111,23 @@ Two mechanical consequences worth knowing:
 
 Middle C alternates clef per prompt on purpose: the reason it is *the* anchor is
 that it is the same ledger line seen from either side, and a prompt that only
-ever arrives in treble never teaches that.
+ever arrives in treble never teaches that. For the same reason the renderer
+draws the **whole grand staff**, always, with the staff being read at full
+strength and the other dimmed. The middle-C tip says "the line between the two
+staves"; drawing one staff made that sentence refer to nothing, which is worse
+than saying nothing.
+
+### Onboarding is a demonstration, not an explanation
+
+§2 forbids every conventional option: no theory prerequisites, no text over
+three sentences, no vague instructions, no menus before playing. What is left is
+to show the answer once. The first time an atom is ever prompted
+(`Prompt.demonstrate`), the key lights, the black-key landmark lights and the
+note is drawn — the learner copies it. That prompt is scored as *revealed*, so
+it banks no hit and earns no day credit; it is scaffolding, and the very next
+prompt of that atom withholds everything again. This is the same
+scaffold-and-fade mechanism F2's `scaffoldAlpha` generalizes, and it is why the
+module needs no tutorial screen.
 
 ### Config parameters and their rationale
 

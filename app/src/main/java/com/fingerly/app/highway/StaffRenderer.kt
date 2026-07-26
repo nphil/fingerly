@@ -52,49 +52,61 @@ class StaffRenderer(context: Context) {
     private val oval = RectF()
 
     /**
-     * @param centerY y of the MIDDLE staff line (half-space 4).
+     * @param midiCenterY y of MIDDLE C — the centre of the grand staff, and the
+     *   line the whole landmark system is measured from.
      * @param staffSpace pixels between two adjacent staff lines.
-     * @param staffWidth horizontal extent of the five lines, centred on [centerX].
+     * @param staffWidth horizontal extent of the lines, centred on [centerX].
      */
     fun draw(
         canvas: Canvas,
         midi: Int,
         clef: Int,
         centerX: Float,
-        centerY: Float,
+        midiCenterY: Float,
         staffSpace: Float,
         staffWidth: Float,
     ) {
         val half = staffSpace / 2f
         val left = centerX - staffWidth / 2f
         val right = centerX + staffWidth / 2f
+        fun yOf(ruler: Int) = midiCenterY - ruler * half
 
-        var h = 0
-        while (h <= Staff.TOP_HALF_SPACE) {
-            val y = centerY - (h - 4) * half
-            canvas.drawLine(left, y, right, y, linePaint)
-            h += 2
-        }
+        // BOTH staves, always. The middle-C rule is only teachable if the thing
+        // it refers to is on screen: C4's ledger line falls exactly halfway
+        // between them, which is visible rather than asserted. The staff being
+        // read is full strength; the other is dimmed so the eye knows where to go.
+        drawStaffLines(canvas, Staff.TREBLE_LINE_STEPS, left, right, ::yOf, clef == Staff.CLEF_TREBLE)
+        drawStaffLines(canvas, Staff.BASS_LINE_STEPS, left, right, ::yOf, clef == Staff.CLEF_BASS)
 
-        // The notehead sits right of centre so the clef has room at the left.
-        val noteX = centerX + staffWidth * 0.18f
-        val noteY = centerY - (Staff.halfSpaces(midi, clef) - 4) * half
+        // The notehead sits right of centre so the clefs have room at the left.
+        val noteX = centerX + staffWidth * 0.20f
+        val noteY = yOf(Staff.stepsFromMiddleC(midi))
 
         val ledgerCount = Staff.ledgerLines(midi, clef, ledgerBuf)
         val ledgerHalfWidth = staffSpace * 0.95f
         for (i in 0 until ledgerCount) {
-            val y = centerY - (ledgerBuf[i] - 4) * half
+            val y = yOf(Staff.rulerOfHalfSpaces(ledgerBuf[i], clef))
             canvas.drawLine(noteX - ledgerHalfWidth, y, noteX + ledgerHalfWidth, y, ledgerPaint)
         }
+
+        val trebleAnchorY = yOf(
+            Staff.rulerOfHalfSpaces(Staff.clefAnchorHalfSpaces(Staff.CLEF_TREBLE), Staff.CLEF_TREBLE),
+        )
+        val bassAnchorY = yOf(
+            Staff.rulerOfHalfSpaces(Staff.clefAnchorHalfSpaces(Staff.CLEF_BASS), Staff.CLEF_BASS),
+        )
 
         if (typeface != null) {
             // SMuFL: 1 em = 4 staff spaces, clef baseline sits on its named line.
             val em = staffSpace * 4f
             glyphPaint.textSize = em
             noteheadPaint.textSize = em
-            val clefGlyph = if (clef == Staff.CLEF_BASS) GLYPH_F_CLEF else GLYPH_G_CLEF
-            val clefY = centerY - (Staff.clefAnchorHalfSpaces(clef) - 4) * half
-            canvas.drawText(clefGlyph, left + staffSpace * 0.5f, clefY, glyphPaint)
+            val clefX = left + staffSpace * 0.5f
+            glyphPaint.alpha = if (clef == Staff.CLEF_TREBLE) 255 else DIM_ALPHA
+            canvas.drawText(GLYPH_G_CLEF, clefX, trebleAnchorY, glyphPaint)
+            glyphPaint.alpha = if (clef == Staff.CLEF_BASS) 255 else DIM_ALPHA
+            canvas.drawText(GLYPH_F_CLEF, clefX, bassAnchorY, glyphPaint)
+            glyphPaint.alpha = 255
             // Notehead origin is its left edge, vertically centred on the pitch.
             canvas.drawText(
                 GLYPH_NOTEHEAD_BLACK,
@@ -105,7 +117,7 @@ class StaffRenderer(context: Context) {
         } else {
             // No font: still readable. An oval on the right line, and the line the
             // clef would have named drawn heavy so the landmark rule survives.
-            val anchorY = centerY - (Staff.clefAnchorHalfSpaces(clef) - 4) * half
+            val anchorY = if (clef == Staff.CLEF_BASS) bassAnchorY else trebleAnchorY
             ledgerPaint.strokeWidth = 6f
             canvas.drawLine(left, anchorY, left + staffSpace * 2f, anchorY, ledgerPaint)
             ledgerPaint.strokeWidth = 2.5f
@@ -117,8 +129,27 @@ class StaffRenderer(context: Context) {
         }
     }
 
+    private inline fun drawStaffLines(
+        canvas: Canvas,
+        steps: IntArray,
+        left: Float,
+        right: Float,
+        yOf: (Int) -> Float,
+        active: Boolean,
+    ) {
+        linePaint.alpha = if (active) 255 else DIM_ALPHA
+        for (s in steps) {
+            val y = yOf(s)
+            canvas.drawLine(left, y, right, y, linePaint)
+        }
+        linePaint.alpha = 255
+    }
+
     private companion object {
         const val ASSET = "Bravura.otf"
+
+        /** The staff not being read stays visible but recedes. */
+        const val DIM_ALPHA = 70
 
         // SMuFL codepoints, escaped: these live in the Private Use Area and
         // must not depend on source-file encoding surviving a round trip.

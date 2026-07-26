@@ -61,6 +61,34 @@ object Staff {
 
     fun isOnLine(midi: Int, clef: Int): Boolean = halfSpaces(midi, clef) % 2 == 0
 
+    // ------------------------------------------------------------- grand staff
+    //
+    // Both staves share ONE continuous diatonic ruler, which is the only way the
+    // middle-C landmark is true rather than asserted: C4 lands exactly halfway
+    // between the bass staff's top line and the treble staff's bottom line, so
+    // "the line between the two staves" is something the learner can see.
+
+    /** C4. Every grand-staff position is measured from here. */
+    val MIDDLE_C_STEP = diatonicStep(60)
+
+    /** Signed diatonic distance from middle C; +1 per letter upward. */
+    fun stepsFromMiddleC(midi: Int): Int = diatonicStep(midi) - MIDDLE_C_STEP
+
+    /** Ruler positions of the five treble lines, low to high (E4…F5). */
+    val TREBLE_LINE_STEPS =
+        IntArray(LINES) { diatonicStep(64) - MIDDLE_C_STEP + it * 2 }
+
+    /** Ruler positions of the five bass lines, low to high (G2…A3). */
+    val BASS_LINE_STEPS =
+        IntArray(LINES) { diatonicStep(43) - MIDDLE_C_STEP + it * 2 }
+
+    /**
+     * Ruler position of a note, and of anything measured in that clef's half
+     * spaces — ledger lines and clef anchors included.
+     */
+    fun rulerOfHalfSpaces(halfSpaces: Int, clef: Int): Int =
+        bottomLineStep(clef) - MIDDLE_C_STEP + halfSpaces
+
     /**
      * Ledger lines needed for [midi], written into [out] as half-space values,
      * returning how many were written. Allocation-free: the renderer owns [out].

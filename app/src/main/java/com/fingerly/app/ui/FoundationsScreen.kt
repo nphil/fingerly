@@ -143,6 +143,9 @@ fun FoundationsScreen(engine: MidiEngine, onCompleted: () -> Unit, onExit: () ->
                             promptClef = ByteArray(d.prompts.size) {
                                 d.prompts[it].clef.toByte()
                             }
+                            promptDemo = BooleanArray(d.prompts.size) {
+                                d.prompts[it].demonstrate
+                            }
                             onEnded = { onDrillEnded(this, d) }
                         }
                     },

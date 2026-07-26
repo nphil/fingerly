@@ -114,4 +114,53 @@ class StaffTest {
             assertTrue("$m needed $n ledger lines", n <= Staff.MAX_LEDGER_LINES)
         }
     }
+
+    @Test
+    fun middleCLandsExactlyBetweenTheTwoStavesOnTheGrandStaff() {
+        // The tip says "the line BETWEEN the two staves". This is what makes it
+        // true instead of a claim the learner has to take on faith.
+        assertEquals(0, Staff.stepsFromMiddleC(midi("C4")))
+        val bassTop = Staff.BASS_LINE_STEPS.last()   // A3
+        val trebleBottom = Staff.TREBLE_LINE_STEPS.first() // E4
+        assertEquals(-2, bassTop)
+        assertEquals(2, trebleBottom)
+        assertEquals("C4 must be the midpoint", 0, (bassTop + trebleBottom) / 2)
+    }
+
+    @Test
+    fun clefAnchorsMapOntoTheGrandStaffRuler() {
+        assertEquals(
+            Staff.stepsFromMiddleC(midi("G4")),
+            Staff.rulerOfHalfSpaces(
+                Staff.clefAnchorHalfSpaces(Staff.CLEF_TREBLE), Staff.CLEF_TREBLE,
+            ),
+        )
+        assertEquals(
+            Staff.stepsFromMiddleC(midi("F3")),
+            Staff.rulerOfHalfSpaces(
+                Staff.clefAnchorHalfSpaces(Staff.CLEF_BASS), Staff.CLEF_BASS,
+            ),
+        )
+    }
+
+    @Test
+    fun bothStavesShareOneRulerSoTheStaffLinesNeverCollide() {
+        val all = Staff.BASS_LINE_STEPS.toList() + Staff.TREBLE_LINE_STEPS.toList()
+        assertEquals("no line may sit on another", all.size, all.toSet().size)
+        assertEquals(all.sorted(), all)
+        // The gap between the staves is exactly one C4 ledger line wide.
+        assertEquals(4, Staff.TREBLE_LINE_STEPS.first() - Staff.BASS_LINE_STEPS.last())
+    }
+
+    @Test
+    fun aLedgerLineMapsToTheSameRulerPositionFromEitherClef() {
+        val out = IntArray(Staff.MAX_LEDGER_LINES)
+        val c4 = midi("C4")
+        Staff.ledgerLines(c4, Staff.CLEF_TREBLE, out)
+        val fromTreble = Staff.rulerOfHalfSpaces(out[0], Staff.CLEF_TREBLE)
+        Staff.ledgerLines(c4, Staff.CLEF_BASS, out)
+        val fromBass = Staff.rulerOfHalfSpaces(out[0], Staff.CLEF_BASS)
+        assertEquals("it is ONE line, drawn in one place", fromTreble, fromBass)
+        assertEquals(0, fromTreble)
+    }
 }
