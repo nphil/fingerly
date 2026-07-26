@@ -63,6 +63,11 @@ fun FoundationsScreen(engine: MidiEngine, onCompleted: () -> Unit, onExit: () ->
     var bankExhausted by remember { mutableStateOf(false) }
     var showDetails by remember { mutableStateOf(false) }
     var showBrief by remember { mutableStateOf(false) }
+    // Shown unprompted until the learner has actually played something, then it
+    // stays available. Reference, never a gate — MIDI cannot see fingers.
+    var showHands by remember {
+        mutableStateOf(!prefs.getBoolean(PREF_HANDS_SEEN, false))
+    }
     var logging by remember { mutableStateOf(RemoteLog.isEnabled()) }
     var lastProbe by remember { mutableStateOf<String?>(null) }
     var runningDrill by remember { mutableStateOf<FoundationsTrainer.Drill?>(null) }
@@ -350,8 +355,13 @@ fun FoundationsScreen(engine: MidiEngine, onCompleted: () -> Unit, onExit: () ->
                         modifier = Modifier.widthIn(max = 620.dp),
                     )
                     if (action.button != null) {
-                        Button(onClick = action.onClick) { Text(action.button) }
+                        Button(onClick = {
+                            prefs.edit().putBoolean(PREF_HANDS_SEEN, true).apply()
+                            action.onClick()
+                        }) { Text(action.button) }
                     }
+
+                    if (showHands) HandPositionCard()
 
                     // What just happened, if anything did.
                     if (probeSummary != null) {
@@ -391,6 +401,9 @@ fun FoundationsScreen(engine: MidiEngine, onCompleted: () -> Unit, onExit: () ->
                     Row(horizontalArrangement = Arrangement.spacedBy(20.dp)) {
                         OutlinedButton(onClick = { showDetails = !showDetails }) {
                             Text(if (showDetails) "Hide detail" else "Detail")
+                        }
+                        OutlinedButton(onClick = { showHands = !showHands }) {
+                            Text(if (showHands) "Hide hands" else "Hands")
                         }
                         OutlinedButton(onClick = { showBrief = !showBrief }) {
                             Text(if (showBrief) "Hide brief" else "What am I testing?")
@@ -468,6 +481,9 @@ private class FoundationsAction(
     val button: String?,
     val onClick: () -> Unit = {},
 )
+
+/** Whether the hand-position reference has been on screen at least once. */
+private const val PREF_HANDS_SEEN = "hands_seen"
 
 /** Which path the learner was last on. Resumption, not a gate. */
 const val PREF_LAST_PATH = "last_path"

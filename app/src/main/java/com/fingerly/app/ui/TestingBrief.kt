@@ -14,11 +14,12 @@ package com.fingerly.app.ui
 object TestingBrief {
 
     /** Shown so a stale brief is visible as stale. */
-    const val BUILD = "F5 — hands together, scaffold fade, new home screen"
+    const val BUILD = "F5b — reachable cold-read floor, hand position, new home screen"
 
     /** The concrete ask. One line each, imperative, no preamble. */
     val doThis = listOf(
-        "One cold read per sitting. Play what you see. Expect to score badly — that is the measurement working, not you failing.",
+        "Set your hands first — the picture under the button. Right thumb on middle C, one finger per white key.",
+        "One cold read per sitting. The first ones are four long notes on the landmarks, so you should be able to get some of them. Expect to miss plenty.",
         "Then one or two drills. Stop when the app says done for today.",
         "Most days beats long days. Spacing is the mechanism; a marathon session does nothing a short one would not.",
     )
@@ -27,7 +28,8 @@ object TestingBrief {
     val feeds = listOf(
         "Cold reads decide whether the drills survive. If bringing keys to criterion does not predict your reading, the drills get deleted rather than added to.",
         "Drill logs tune how fast the help fades and how long the app waits before showing an answer.",
-        "Hands-together prompts are new this build — whether they are playable at all decides if they stay.",
+        "Hands-together prompts are new — whether they are playable at all decides if they stay.",
+        "If the cold read is still zero after a week of sittings, the excerpts are too hard and the floor gets lowered again, not you pushed harder.",
     )
 
     const val howLong =
@@ -40,6 +42,6 @@ object TestingBrief {
 
     /** The one thing currently blocked on the learner, or null when nothing is. */
     const val blocking =
-        "Blocked on you: whether hands-together prompts are physically playable, and whether this screen " +
-            "explains itself without being told."
+        "Blocked on you: whether the first cold reads score above zero, whether hands-together prompts are " +
+            "physically playable, and whether this screen explains itself without being told."
 }

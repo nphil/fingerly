@@ -98,10 +98,45 @@ class ExcerptBankTest {
 
     @Test
     fun singleHandExcerptsScoreNoHandsTogetherCredit() {
+        // "Single hand" means the hands never sound together — not that the left
+        // hand is absent. The floor tier includes a left-hand-only excerpt,
+        // because the bass F landmark is one of the three the module teaches.
         for (e in ExcerptBank.all.filter { !it.handsTogether }) {
             assertEquals(e.id, 0, e.scorableHandsTogetherOnsets())
-            assertTrue(e.notes.none { it.hand == ChartNote.HAND_LEFT })
+            val rights = e.notes.filter { it.hand == ChartNote.HAND_RIGHT }
+            val lefts = e.notes.filter { it.hand == ChartNote.HAND_LEFT }
+            for (r in rights) {
+                assertTrue(
+                    "${e.id}: hands overlap at beat ${r.startBeat}",
+                    lefts.none {
+                        r.startBeat < it.startBeat + it.durationBeats - 1e-9 &&
+                            it.startBeat < r.startBeat + r.durationBeats - 1e-9
+                    },
+                )
+            }
         }
+    }
+
+    @Test
+    fun theFloorTierIsReachableBySomeoneWhoKnowsOnlyTheLandmarks() {
+        // The instrument needs a level a week-one beginner can actually score
+        // above zero on, or it reports a flat line that means nothing.
+        val floor = ExcerptBank.all.filter { it.tier == ExcerptBank.TIER_ANCHORS }
+        assertTrue("there must be a floor tier", floor.size >= 4)
+        val landmarks = setOf(60, 67, 53) // middle C, treble G, bass F
+        for (e in floor) {
+            assertTrue(
+                "${e.id} uses pitches outside the three landmarks",
+                e.notes.all { it.midi in landmarks },
+            )
+            assertTrue("${e.id} is too dense for a floor", e.notes.size <= 8)
+            assertTrue(
+                "${e.id} has notes shorter than half a bar",
+                e.notes.all { it.durationBeats >= 2.0 },
+            )
+        }
+        // And it is served FIRST, before anything that assumes reading.
+        assertEquals(ExcerptBank.TIER_ANCHORS, ExcerptBank.nextUnseen(emptySet())!!.tier)
     }
 
     @Test

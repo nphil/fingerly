@@ -171,6 +171,39 @@ them and the drill screen scores the whole block. A hands-together prompt's
 latency is the slower of the two notes, because it is not finished until both
 have arrived.
 
+### The instrument needs a floor the learner can reach
+
+Grading the cold-read excerpts across four tiers was not enough, because the
+easiest tier still assumed reading: fifteen stepwise notes at 1.2s intervals is
+not a hard test for someone who cannot find middle C, it is an unanswerable one.
+An unanswerable test returns zero for weeks, and a flat zero cannot be told apart
+from "nothing is transferring" — which is the one conclusion the falsification
+check exists to draw.
+
+So there is now a tier beneath it: four long notes in four bars, drawn only from
+the three landmarks the module teaches first. Someone who knows exactly one
+thing — where middle C is — can score above zero on their first sitting, which
+means the slope is measurable from the start instead of after the floor lifts.
+
+The rule this encodes: **if the probe reads zero for a week, the instrument is
+wrong, not the learner.** Lower the floor again rather than pushing harder.
+
+### Hand position is reference, not a task
+
+MIDI transmits pitch, not fingers, so "thumb on middle C" is unverifiable and
+certifying it would repeat the mistake that deleted the fingering atoms. But the
+conclusion drawn from that — "hand position becomes a one-time animation with no
+✓" — was never actually built, so the thing the learner named as their blocker
+three separate times had no coverage at all.
+
+`HandPositionCard` draws it: two octaves of white keys with the real black-key
+grouping, five numbered fingers on C–G, and an exact instruction rather than a
+vague one (SPEC §2.5 — "right thumb on middle C", never "a comfortable
+position"). It shows unprompted until the first time anything is played, then
+lives behind a toggle. Nothing scores it and no checkmark attaches to it, and the
+card says so out loud, because a reference the learner thinks is being graded is
+a task.
+
 ### The home screen is one action, not a dashboard
 
 The map opened onto thirteen rows reading "0/3 today · 0/3 days" with no legend,

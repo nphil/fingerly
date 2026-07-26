@@ -32,10 +32,18 @@ object ExcerptBank {
     const val SPAN_LOW = 43 // G2 — the left hand of the bundled Ode to Joy
     const val SPAN_HIGH = 67 // G4
 
-    const val TIER_STEPWISE = 0
-    const val TIER_SKIPS = 1
-    const val TIER_HANDS_SUSTAINED = 2
-    const val TIER_HANDS_MOVING = 3
+    /**
+     * Four landmark notes in four bars, nothing else. This tier exists so the
+     * instrument has a FLOOR a week-one beginner can actually reach: an excerpt
+     * of fifteen stepwise notes is not a hard test for someone who cannot find
+     * middle C, it is an unanswerable one, and an unanswerable test produces a
+     * flat zero for weeks that says nothing about whether anything is working.
+     */
+    const val TIER_ANCHORS = 0
+    const val TIER_STEPWISE = 1
+    const val TIER_SKIPS = 2
+    const val TIER_HANDS_SUSTAINED = 3
+    const val TIER_HANDS_MOVING = 4
 
     class Note(
         val midi: Int,
@@ -171,9 +179,9 @@ object ExcerptBank {
         return (octave + 1) * 12 + semis
     }
 
-    private fun excerpt(id: String, tier: Int, right: String, left: String? = null): Excerpt {
+    private fun excerpt(id: String, tier: Int, right: String? = null, left: String? = null): Excerpt {
         val notes = ArrayList<Note>()
-        notes.addAll(parseLine(right, ChartNote.HAND_RIGHT))
+        if (right != null) notes.addAll(parseLine(right, ChartNote.HAND_RIGHT))
         if (left != null) notes.addAll(parseLine(left, ChartNote.HAND_LEFT))
         return Excerpt(id, tier, notes)
     }
@@ -183,7 +191,21 @@ object ExcerptBank {
      * G2–G4, using only quarters, halves and wholes.
      */
     val all: List<Excerpt> = listOf(
-        // --- Tier 0: right hand, stepwise, five-finger position ---------------
+        // --- Tier 0: landmarks only, one note per bar -------------------------
+        // Answerable by someone who knows exactly one thing: where middle C is.
+        excerpt("a0-middle-c", TIER_ANCHORS,
+            right = "C4 - - - | C4 - - - | C4 - - - | C4 - - -"),
+        excerpt("a0-c-and-g", TIER_ANCHORS,
+            right = "C4 - - - | G4 - - - | C4 - - - | G4 - - -"),
+        excerpt("a0-c-g-halves", TIER_ANCHORS,
+            right = "C4 - G4 - | C4 - G4 - | G4 - C4 - | C4 - - -"),
+        excerpt("a0-bass-f", TIER_ANCHORS,
+            left = "F3 - - - | F3 - - - | F3 - - - | F3 - - -"),
+        excerpt("a0-both-anchors", TIER_ANCHORS,
+            right = "C4 - - - | . . . . | G4 - - - | . . . .",
+            left = ". . . . | F3 - - - | . . . . | F3 - - -"),
+
+        // --- Tier 1: right hand, stepwise, five-finger position ---------------
         excerpt("t0-scale-up", TIER_STEPWISE,
             "C4 D4 E4 F4 | G4 - - - | F4 E4 D4 C4 | C4 - - -"),
         excerpt("t0-ode", TIER_STEPWISE,
