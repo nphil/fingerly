@@ -89,7 +89,7 @@ fun FoundationsScreen(
     LaunchedEffect(Unit) {
         trainer = FoundationsTrainer(repo.getSetting(SETTING_KEY)).apply { startSitting(dayIndex) }
         repo.allProbes().lastOrNull()?.let {
-            lastProbe = "${it.hits}/${it.noteCount} pitches, ${it.avgAbsErrorMs}ms off"
+            lastProbe = "${it.hits}/${it.noteCount} right keys, ${it.avgAbsErrorMs}ms off"
         }
         if (repo.probesToday(dayIndex) == 0) {
             val next = ExcerptBank.nextUnseen(repo.consumedExcerpts())
@@ -202,7 +202,7 @@ fun FoundationsScreen(
                 "hit=${judge.hits}/${judge.noteCount} " +
                 "err=${judge.avgAbsErrorMs()}ms cov=${(judge.timingCoverage() * 100).toInt()}%",
         )
-        probeSummary = "Cold read: ${judge.hits}/${judge.noteCount} pitches, " +
+        probeSummary = "Unseen read: ${judge.hits}/${judge.noteCount} right keys, " +
             "${judge.avgAbsErrorMs()}ms average timing. Counts for nothing — it is the measurement."
         probe = null
         probeDue = false
@@ -315,9 +315,9 @@ fun FoundationsScreen(
                         button = null,
                     )
                     probeDue -> FoundationsAction(
-                        title = "Play these four bars",
-                        detail = "You have not seen them before. Get it wrong — " +
-                            "this is the measurement, not a test you can fail.",
+                        title = "Play these four marks",
+                        detail = "You have not seen these before. Getting them wrong is " +
+                            "fine — this is the measurement, not a test you can fail.",
                         button = "Start · about 40s",
                         onClick = {
                             scope.launch {
@@ -332,7 +332,7 @@ fun FoundationsScreen(
                     next != null -> FoundationsAction(
                         title = next.title,
                         detail = next.tip
-                            ?: "A note appears on the staff. Find it on the piano.",
+                            ?: "A mark appears on the chart. Find that key on the piano.",
                         button = "Start · ${next.prompts.size} notes, about a minute",
                         onClick = {
                             t.startDrill(next)
@@ -386,7 +386,7 @@ fun FoundationsScreen(
                     // Standing state, two lines. The READ is the headline because
                     // it is the only number here that is not self-graded.
                     Text(
-                        "Reading: " + (lastProbe ?: "not measured yet"),
+                        "Unseen read: " + (lastProbe ?: "not measured yet"),
                         color = Dim2,
                     )
                     Text(
@@ -405,7 +405,7 @@ fun FoundationsScreen(
 
                     Row(horizontalArrangement = Arrangement.spacedBy(20.dp)) {
                         OutlinedButton(onClick = {
-                            prefs.edit().putBoolean(PREF_ORIENTATION_DONE, false).apply()
+                            prefs.edit().putBoolean(PREF_FIRST_RUN_DONE, false).apply()
                             onRedoSetup()
                         }) { Text("Start over") }
                         OutlinedButton(onClick = { showBrief = !showBrief }) {
@@ -451,7 +451,7 @@ fun FoundationsScreen(
                     if (showDetails) {
                         Text(
                             "hits today / needed · separate days / needed. " +
-                                "A key is solid at 3 hits on 3 different days with no help.",
+                                "A key is solid at 3 right presses on 3 different days with no help.",
                             color = Dim2,
                             modifier = Modifier.widthIn(max = 700.dp),
                         )
@@ -466,7 +466,7 @@ fun FoundationsScreen(
                                 Text(
                                     "${row.hitsToday}/${row.hitsWanted}   " +
                                         "${row.daysCredited}/${row.daysWanted} days" +
-                                        (if (row.rung > 0) "   +${row.rung} oct" else ""),
+                                        "",
                                     color = Dim2,
                                 )
                             }

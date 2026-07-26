@@ -204,6 +204,46 @@ lives behind a toggle. Nothing scores it and no checkmark attaches to it, and th
 card says so out loud, because a reference the learner thinks is being graded is
 a task.
 
+### The first run teaches the keyboard before it teaches a letter
+
+The previous orientation was five steps and taught by restudy: here is middle C,
+now press middle C. It also reported errors as "that was D#4" — scientific pitch
+notation, to someone who had been given no letters at all — advanced under his
+hands on every press, and hard-locked if he tapped Skip.
+
+The replacement is fifteen steps, and the load-bearing reordering is that **the
+black-key grouping comes before any letter name**. A group of two is a visual
+pattern the learner can verify himself by looking at the instrument; a letter is
+a fact he can only be told. So he presses black keys in groups, finds the middle
+group by counting three either side, learns that the white key left of a pair is
+a C, and only then learns that one particular C has a name. Middle C is pressed
+five times across the run, three of them unaided.
+
+Global rules, each fixing a specific observed failure:
+- **Keys play, taps navigate.** A correct press freezes the screen and reveals
+  Next. Nothing advances on a press, so the screen never moves under his hands
+  while he is exploring.
+- **Wrong presses are a distance in white keys, never a name** — "3 white keys
+  left", which is countable by someone who knows no letters.
+- **Show me is manual and two-stage**: decompose the rule first, reveal the key
+  second. Never on a timer — a timed reveal makes waiting free, whereas a tap
+  costs an action and is logged.
+- **Stop for now on every screen**, resuming at the start of the last completed
+  block rather than mid-block.
+- The keyboard facts the script asserts — seven groups of two, middle C against
+  the fourth with three either side, eight Cs, the lone bottom black key that
+  belongs to no group — are in `core/notation/KeyGeography` and unit-tested,
+  because telling a beginner something false about the instrument in front of
+  him is the worst failure available here.
+
+Vocabulary is a ledger, not a habit. *Chart* replaces staff/staves/grand staff;
+*mark* replaces note (which ambiguously means both the key and the symbol);
+*place* replaces line/space/step; *unseen read* replaces cold read; *solid*
+replaces criterion. Clefs are never named — they are labelled "these two never
+change". Banned for the first session only, not forever: §4a-F condition 3 and
+F4 both need bar, beat and tempo eventually, and SPEC §4 licenses exactly this
+("optional, late, never a gate").
+
 ### The home screen is one action, not a dashboard
 
 The map opened onto thirteen rows reading "0/3 today · 0/3 days" with no legend,

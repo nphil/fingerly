@@ -137,7 +137,7 @@ fun FingerlyApp(
                     // the whole module assumes, with every step verified by a real
                     // press. Once only; re-openable from Basics.
                     var oriented by remember {
-                        mutableStateOf(prefs.getBoolean(PREF_ORIENTATION_DONE, false))
+                        mutableStateOf(prefs.getBoolean(PREF_FIRST_RUN_DONE, false))
                     }
                     var path by remember {
                         mutableStateOf(prefs.getString(PREF_LAST_PATH, PATH_BASICS))
@@ -147,10 +147,10 @@ fun FingerlyApp(
                         path = next
                     }
                     if (!oriented) {
-                        OrientationScreen(
+                        FirstRunScreen(
                             engine = engine,
-                            onDone = {
-                                prefs.edit().putBoolean(PREF_ORIENTATION_DONE, true).apply()
+                            onFinished = {
+                                prefs.edit().putBoolean(PREF_FIRST_RUN_DONE, true).apply()
                                 oriented = true
                             },
                         )
