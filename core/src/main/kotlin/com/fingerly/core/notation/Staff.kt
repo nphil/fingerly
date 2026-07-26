@@ -126,4 +126,64 @@ object Staff {
 
     /** Ledger lines never exceed this for the C3–G4 span the module trains. */
     const val MAX_LEDGER_LINES = 6
+
+    // ------------------------------------------------------- horizontal ruler
+    //
+    // Notation is a chart (SPEC §4): y is pitch, x is time. The vertical ruler
+    // above is diatonic; this one is metric. Both are pure so placement is
+    // unit-tested rather than nudged until it looks right.
+
+    /** Note head shapes. Duration is read off the shape, not printed anywhere. */
+    const val HEAD_WHOLE = 0
+    const val HEAD_HALF = 1
+    const val HEAD_QUARTER = 2
+
+    /**
+     * Which notehead a duration draws. Beats are quarter-notes. The module's
+     * excerpts are quarter/half/whole only — no beams, no dots, no tuplets —
+     * so anything shorter than a beat is rendered as a quarter rather than
+     * silently mis-drawn.
+     */
+    fun headForBeats(beats: Double): Int = when {
+        beats >= 3.5 -> HEAD_WHOLE
+        beats >= 1.75 -> HEAD_HALF
+        else -> HEAD_QUARTER
+    }
+
+    /** A stem points down above the middle line, up below it. */
+    fun stemUp(halfSpacesFromMiddleLine: Int): Boolean = halfSpacesFromMiddleLine < 0
+
+    /**
+     * Fraction of the excerpt's width at which a note at [beat] is drawn.
+     * [totalBeats] is the excerpt's full length. Notes are laid out
+     * proportionally to time — the chart reading SPEC §4 asks for — with a
+     * left inset for the clef and a right margin so the last note is not
+     * flush against the final barline.
+     */
+    fun xFraction(beat: Double, totalBeats: Double): Double {
+        if (totalBeats <= 0.0) return LEFT_INSET
+        val t = (beat / totalBeats).coerceIn(0.0, 1.0)
+        return LEFT_INSET + t * (1.0 - LEFT_INSET - RIGHT_MARGIN)
+    }
+
+    /** Barline positions as width fractions, including the closing line. */
+    fun barlineFractions(totalBeats: Double, beatsPerBar: Int, out: DoubleArray): Int {
+        if (beatsPerBar <= 0 || totalBeats <= 0.0) return 0
+        var n = 0
+        var beat = beatsPerBar.toDouble()
+        while (beat <= totalBeats + 1e-9 && n < out.size) {
+            out[n++] = xFraction(beat, totalBeats)
+            beat += beatsPerBar
+        }
+        return n
+    }
+
+    /** Room for the clef; notation starts after it, never under it. */
+    const val LEFT_INSET = 0.14
+
+    /** Breathing room before the closing barline. */
+    const val RIGHT_MARGIN = 0.06
+
+    /** Four bars of 4/4 is 16 barline slots' worth of headroom. */
+    const val MAX_BARLINES = 16
 }

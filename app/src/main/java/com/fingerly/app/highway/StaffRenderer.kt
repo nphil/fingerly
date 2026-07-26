@@ -48,7 +48,19 @@ class StaffRenderer(context: Context) {
         color = Color.rgb(0, 230, 118)
     }
 
+    /** Uniform ink for excerpt noteheads — the cursor is the only accent. */
+    private val inkPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.rgb(232, 240, 244)
+        typeface = this@StaffRenderer.typeface
+    }
+    private val hollowPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.rgb(232, 240, 244)
+        style = Paint.Style.STROKE
+        strokeWidth = 3f
+    }
+
     private val ledgerBuf = IntArray(Staff.MAX_LEDGER_LINES)
+    private val barlineBuf = DoubleArray(Staff.MAX_BARLINES)
     private val oval = RectF()
 
     /**
@@ -129,6 +141,129 @@ class StaffRenderer(context: Context) {
         }
     }
 
+    /**
+     * A whole excerpt: both staves, barlines, and every note laid out with x as
+     * time (SPEC §4 — notation is a chart). This is the cold-read surface.
+     *
+     * Notes are passed as parallel arrays rather than objects because this runs
+     * per frame and the hot-path rule forbids allocating (SPEC §1). [count] may
+     * be smaller than the arrays.
+     *
+     * Deliberately absent: beams, dots, tuplets, accidentals, key signatures,
+     * rests, slurs, dynamics. A four-bar diatonic C3–G4 excerpt needs none of
+     * them, and an engraving engine is where this kind of module stops shipping.
+     */
+    fun drawExcerpt(
+        canvas: Canvas,
+        midi: IntArray,
+        startBeats: DoubleArray,
+        durationBeats: DoubleArray,
+        clefs: ByteArray,
+        count: Int,
+        totalBeats: Double,
+        beatsPerBar: Int,
+        centerX: Float,
+        midiCenterY: Float,
+        staffSpace: Float,
+        staffWidth: Float,
+        /** Index of the note to highlight as "next", or -1 for none. */
+        cursor: Int = -1,
+    ) {
+        val half = staffSpace / 2f
+        val left = centerX - staffWidth / 2f
+        val right = centerX + staffWidth / 2f
+        fun yOf(ruler: Int) = midiCenterY - ruler * half
+        fun xOf(beat: Double) =
+            left + (Staff.xFraction(beat, totalBeats) * staffWidth).toFloat()
+
+        // Both staves at full strength: an excerpt is read across the pair.
+        linePaint.alpha = 255
+        for (s in Staff.TREBLE_LINE_STEPS) canvas.drawLine(left, yOf(s), right, yOf(s), linePaint)
+        for (s in Staff.BASS_LINE_STEPS) canvas.drawLine(left, yOf(s), right, yOf(s), linePaint)
+
+        // The brace: one vertical rule joining the staves, which is what makes
+        // the pair read as a single system rather than two unrelated staves.
+        val topY = yOf(Staff.TREBLE_LINE_STEPS.last())
+        val bottomY = yOf(Staff.BASS_LINE_STEPS.first())
+        canvas.drawLine(left, topY, left, bottomY, linePaint)
+
+        val barCount = Staff.barlineFractions(totalBeats, beatsPerBar, barlineBuf)
+        for (i in 0 until barCount) {
+            val x = left + (barlineBuf[i] * staffWidth).toFloat()
+            canvas.drawLine(x, topY, x, bottomY, linePaint)
+        }
+
+        if (typeface != null) {
+            val em = staffSpace * 4f
+            glyphPaint.textSize = em
+            glyphPaint.alpha = 255
+            val clefX = left + staffSpace * 0.5f
+            canvas.drawText(
+                GLYPH_G_CLEF, clefX,
+                yOf(
+                    Staff.rulerOfHalfSpaces(
+                        Staff.clefAnchorHalfSpaces(Staff.CLEF_TREBLE), Staff.CLEF_TREBLE,
+                    ),
+                ),
+                glyphPaint,
+            )
+            canvas.drawText(
+                GLYPH_F_CLEF, clefX,
+                yOf(
+                    Staff.rulerOfHalfSpaces(
+                        Staff.clefAnchorHalfSpaces(Staff.CLEF_BASS), Staff.CLEF_BASS,
+                    ),
+                ),
+                glyphPaint,
+            )
+            noteheadPaint.textSize = em
+        }
+
+        var i = 0
+        while (i < count) {
+            val clef = clefs[i].toInt()
+            val ruler = Staff.stepsFromMiddleC(midi[i])
+            val x = xOf(startBeats[i])
+            val y = yOf(ruler)
+
+            val ledgerCount = Staff.ledgerLines(midi[i], clef, ledgerBuf)
+            val ledgerHalfWidth = staffSpace * 0.95f
+            for (k in 0 until ledgerCount) {
+                val ly = yOf(Staff.rulerOfHalfSpaces(ledgerBuf[k], clef))
+                canvas.drawLine(x - ledgerHalfWidth, ly, x + ledgerHalfWidth, ly, ledgerPaint)
+            }
+
+            val head = Staff.headForBeats(durationBeats[i])
+            // The cursor is the only colour difference: read position, not a
+            // verdict. Everything else is uniform ink.
+            val paint = if (i == cursor) noteheadPaint else inkPaint
+            if (typeface != null) {
+                val glyph = when (head) {
+                    Staff.HEAD_WHOLE -> GLYPH_NOTEHEAD_WHOLE
+                    Staff.HEAD_HALF -> GLYPH_NOTEHEAD_HALF
+                    else -> GLYPH_NOTEHEAD_BLACK
+                }
+                paint.textSize = staffSpace * 4f
+                val w = paint.measureText(glyph)
+                canvas.drawText(glyph, x - w / 2f, y, paint)
+                if (head != Staff.HEAD_WHOLE) {
+                    // Stem turns at the staff's own middle line, per clef.
+                    val fromMiddle = Staff.halfSpaces(midi[i], clef) - 4
+                    val up = Staff.stemUp(fromMiddle)
+                    val sx = if (up) x + w / 2f else x - w / 2f
+                    val sy = if (up) y - staffSpace * 3.5f else y + staffSpace * 3.5f
+                    canvas.drawLine(sx, y, sx, sy, ledgerPaint)
+                }
+            } else {
+                oval.set(x - staffSpace * 0.62f, y - half, x + staffSpace * 0.62f, y + half)
+                if (head == Staff.HEAD_QUARTER) canvas.drawOval(oval, paint) else {
+                    canvas.drawOval(oval, hollowPaint)
+                }
+            }
+            i++
+        }
+    }
+
     private inline fun drawStaffLines(
         canvas: Canvas,
         steps: IntArray,
@@ -156,6 +291,8 @@ class StaffRenderer(context: Context) {
         const val GLYPH_G_CLEF = "\uE050"
         const val GLYPH_F_CLEF = "\uE062"
         const val GLYPH_NOTEHEAD_BLACK = "\uE0A4"
+        const val GLYPH_NOTEHEAD_HALF = "\uE0A3"
+        const val GLYPH_NOTEHEAD_WHOLE = "\uE0A2"
 
         /** Loaded once per renderer; a missing font degrades, never crashes. */
         fun load(context: Context): Typeface? = try {

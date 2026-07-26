@@ -163,4 +163,76 @@ class StaffTest {
         assertEquals("it is ONE line, drawn in one place", fromTreble, fromBass)
         assertEquals(0, fromTreble)
     }
+    // ------------------------------------------------- horizontal ruler (F3)
+
+    @Test
+    fun timeIsLaidOutProportionallyBetweenClefAndClosingBarline() {
+        val total = 16.0 // four bars of 4/4
+        assertEquals(Staff.LEFT_INSET, Staff.xFraction(0.0, total), 1e-9)
+        assertEquals(
+            1.0 - Staff.RIGHT_MARGIN,
+            Staff.xFraction(total, total),
+            1e-9,
+        )
+        // Halfway through the excerpt is halfway across the usable width.
+        val mid = Staff.xFraction(total / 2, total)
+        assertEquals(
+            (Staff.LEFT_INSET + (1.0 - Staff.RIGHT_MARGIN)) / 2, mid, 1e-9,
+        )
+        // Nothing is ever drawn under the clef.
+        for (b in 0..16) {
+            val x = Staff.xFraction(b.toDouble(), total)
+            assertTrue("beat $b left of the clef", x >= Staff.LEFT_INSET - 1e-9)
+            assertTrue("beat $b past the barline", x <= 1.0 - Staff.RIGHT_MARGIN + 1e-9)
+        }
+    }
+
+    @Test
+    fun equalBeatsAreEquallySpaced() {
+        val total = 16.0
+        val step = Staff.xFraction(1.0, total) - Staff.xFraction(0.0, total)
+        for (b in 1..15) {
+            val d = Staff.xFraction(b + 1.0, total) - Staff.xFraction(b.toDouble(), total)
+            assertEquals("beat $b", step, d, 1e-9)
+        }
+    }
+
+    @Test
+    fun fourBarsOfFourFourDrawFourBarlinesEndingAtTheClosingLine() {
+        val out = DoubleArray(Staff.MAX_BARLINES)
+        val n = Staff.barlineFractions(16.0, 4, out)
+        assertEquals(4, n)
+        assertEquals(Staff.xFraction(4.0, 16.0), out[0], 1e-9)
+        assertEquals(Staff.xFraction(16.0, 16.0), out[3], 1e-9)
+        // The last barline is the closing one, at the right margin.
+        assertEquals(1.0 - Staff.RIGHT_MARGIN, out[3], 1e-9)
+    }
+
+    @Test
+    fun barlineWalkIsBoundedAndDegradesSafely() {
+        val out = DoubleArray(Staff.MAX_BARLINES)
+        assertEquals(0, Staff.barlineFractions(16.0, 0, out))
+        assertEquals(0, Staff.barlineFractions(0.0, 4, out))
+        // A pathological excerpt cannot overrun the caller's buffer.
+        val tiny = DoubleArray(2)
+        assertEquals(2, Staff.barlineFractions(400.0, 1, tiny))
+    }
+
+    @Test
+    fun noteheadShapeComesFromDurationNotFromText() {
+        assertEquals(Staff.HEAD_QUARTER, Staff.headForBeats(1.0))
+        assertEquals(Staff.HEAD_HALF, Staff.headForBeats(2.0))
+        assertEquals(Staff.HEAD_WHOLE, Staff.headForBeats(4.0))
+        // Anything shorter than a beat draws as a quarter rather than silently
+        // becoming a shape the module never teaches.
+        assertEquals(Staff.HEAD_QUARTER, Staff.headForBeats(0.5))
+        assertEquals(Staff.HEAD_QUARTER, Staff.headForBeats(0.25))
+    }
+
+    @Test
+    fun stemsTurnAtTheMiddleLine() {
+        assertTrue(Staff.stemUp(-1))   // below the middle line: stem up
+        assertFalse(Staff.stemUp(0))   // on it: stem down, by convention
+        assertFalse(Staff.stemUp(3))   // above it: stem down
+    }
 }
