@@ -136,6 +136,13 @@ fun FoundationsScreen(engine: MidiEngine, onCompleted: () -> Unit, onExit: () ->
                             revealAfterMs = t.config.revealAfterMs
                             forceAdvanceAfterMs = t.config.forceAdvanceAfterMs
                             promptLabels = Array(d.prompts.size) { d.prompts[it].label }
+                            // Staff prompts (SPEC §4a-F): notation instead of words.
+                            promptRender = ByteArray(d.prompts.size) {
+                                d.prompts[it].render.toByte()
+                            }
+                            promptClef = ByteArray(d.prompts.size) {
+                                d.prompts[it].clef.toByte()
+                            }
                             onEnded = { onDrillEnded(this, d) }
                         }
                     },

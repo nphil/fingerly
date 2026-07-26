@@ -5,6 +5,7 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
+import com.fingerly.core.notation.Staff
 import org.junit.Test
 
 class FoundationsTrainerTest {
@@ -41,7 +42,11 @@ class FoundationsTrainerTest {
         val t = FoundationsTrainer()
         val d = t.previewDrill()!!
         d.prompts.forEach { p ->
-            if (p.atomId != FoundationsTrainer.ATOM_OCTAVES) {
+            // Staff prompts name their pitch by position, so they are exempt:
+            // this rule is about the WORDED letter atoms.
+            if (p.atomId != FoundationsTrainer.ATOM_OCTAVES &&
+                p.render != FoundationsTrainer.RENDER_STAFF
+            ) {
                 assertTrue("note ${p.midiNote} outside home octave", p.midiNote in 60..71)
                 // The prompt must never demand an octave digit the learner has
                 // not been taught — and must state the rule it will grade by.
@@ -164,7 +169,10 @@ class FoundationsTrainerTest {
         }
         assertTrue("expected mastery after spaced perfect practice", t.allMastered())
         t.atoms.forEach { (id, st) ->
-            assertTrue("$id lacks off-home-octave evidence", st.hitsBeyondHomeOctave() >= 1)
+            // Pinned-pitch atoms (the staff landmarks) have no octaves to leave.
+            if (st.maxRung > 0) {
+                assertTrue("$id lacks off-home-octave evidence", st.hitsBeyondHomeOctave() >= 1)
+            }
             assertTrue("$id lacks spaced days", st.daysCredited >= 3)
         }
         assertTrue(t.report().contains("separate days"))
@@ -321,7 +329,7 @@ class FoundationsTrainerTest {
         val ids = FoundationsTrainer().atoms.keys
         assertFalse(ids.contains("rh-position"))
         assertFalse(ids.contains("lh-position"))
-        assertEquals(8, ids.size) // 7 letters + octave numbers
+        assertEquals(11, ids.size) // 7 letters + octave numbers + 3 staff landmarks
     }
 
     @Test
@@ -329,11 +337,143 @@ class FoundationsTrainerTest {
         val t = FoundationsTrainer()
         perfectDrill(t, day = 0)
         val rows = t.masteryRows()
-        assertEquals(8, rows.size)
+        assertEquals(11, rows.size)
         rows.forEach { row ->
             assertTrue(row.hitsWanted > 0)
             assertEquals(t.config.criterionDays, row.daysWanted)
             assertTrue(row.hitsToday >= 0)
         }
+    }
+
+    // ---------------------------------------------------------- SPEC §4a-F: staff
+
+    @Test
+    fun landmarkAtomsAreNotatedNotWorded() {
+        val t = FoundationsTrainer(atomDefs = FoundationsTrainer.defaultAtoms())
+        for (id in FoundationsTrainer.LANDMARK_ATOMS) {
+            assertTrue("$id must exist", t.atoms.containsKey(id))
+        }
+        var seen = 0
+        repeat(60) {
+            val d = t.previewDrill() ?: return@repeat
+            t.startDrill(d)
+            for (p in d.prompts) {
+                if (p.atomId !in FoundationsTrainer.LANDMARK_ATOMS) continue
+                seen++
+                assertEquals(FoundationsTrainer.RENDER_STAFF, p.render)
+                // The staff IS the question: no words, and no letter to read off.
+                assertEquals("", p.label)
+                // A staff position names exactly one pitch, so octave slack is wrong.
+                assertFalse(p.matchAnyOctave)
+                assertTrue(p.clef == Staff.CLEF_TREBLE || p.clef == Staff.CLEF_BASS)
+            }
+            t.recordResults(d.prompts.map { hit(it) }, dayIndex = it)
+        }
+        assertTrue("landmark prompts must actually be served", seen > 0)
+    }
+
+    @Test
+    fun eachLandmarkIsPinnedToItsOwnPitchAndClef() {
+        val defs = FoundationsTrainer.defaultAtoms().associateBy { it.id }
+        val rng = kotlin.random.Random(1)
+        val c4 = defs.getValue(FoundationsTrainer.ATOM_LANDMARK_C4)
+        val g4 = defs.getValue(FoundationsTrainer.ATOM_LANDMARK_G4)
+        val f3 = defs.getValue(FoundationsTrainer.ATOM_LANDMARK_F3)
+        repeat(20) { rung ->
+            assertEquals(60, c4.promptNote(rng, rung % 3))
+            assertEquals(67, g4.promptNote(rng, rung % 3))
+            assertEquals(53, f3.promptNote(rng, rung % 3))
+        }
+        // Middle C is the shared ledger line, so it must arrive from either side.
+        assertEquals(Staff.CLEF_EITHER, c4.clef)
+        assertEquals(Staff.CLEF_TREBLE, g4.clef)
+        assertEquals(Staff.CLEF_BASS, f3.clef)
+        // The landmark clefs point at exactly the landmark pitches.
+        assertEquals(
+            Staff.clefAnchorHalfSpaces(Staff.CLEF_TREBLE),
+            Staff.halfSpaces(67, Staff.CLEF_TREBLE),
+        )
+        assertEquals(
+            Staff.clefAnchorHalfSpaces(Staff.CLEF_BASS),
+            Staff.halfSpaces(53, Staff.CLEF_BASS),
+        )
+    }
+
+    @Test
+    fun middleCPromptsArriveInBothClefsOverTime() {
+        // Drill only middle C, so every prompt exercises the clef choice.
+        val onlyC4 = FoundationsTrainer.defaultAtoms()
+            .filter { it.id == FoundationsTrainer.ATOM_LANDMARK_C4 }
+        val seen = HashSet<Int>()
+        val t = FoundationsTrainer(atomDefs = onlyC4)
+        repeat(20) {
+            val d = t.previewDrill() ?: return@repeat
+            d.prompts.forEach { seen.add(it.clef) }
+            t.startDrill(d)
+        }
+        assertEquals("middle C must be shown from both sides", 2, seen.size)
+        assertTrue(seen.contains(Staff.CLEF_TREBLE) && seen.contains(Staff.CLEF_BASS))
+    }
+
+    @Test
+    fun aFixedPitchAtomCanStillReachMastery() {
+        // The beyond-home-octave requirement is evidence that the LETTER
+        // transfers across octaves. A landmark has one pitch by definition, so
+        // demanding it would make these atoms permanently unmasterable.
+        val t = FoundationsTrainer(atomDefs = FoundationsTrainer.defaultAtoms())
+        val id = FoundationsTrainer.ATOM_LANDMARK_G4
+        val st = t.atoms.getValue(id)
+        assertEquals(0, st.maxRung)
+        val p = FoundationsTrainer.Prompt(id, 67, "", false, FoundationsTrainer.RENDER_STAFF)
+        for (day in 1..3) {
+            t.startSitting(day)
+            t.recordResults(List(3) { hit(p) }, dayIndex = day)
+        }
+        assertEquals(0, st.rung)
+        assertEquals(0, st.hitsBeyondHomeOctave())
+        assertTrue("a pinned-pitch atom must be masterable", st.mastered())
+    }
+
+    @Test
+    fun landmarkAtomsNeverClimbTheOctaveLadder() {
+        val t = FoundationsTrainer(atomDefs = FoundationsTrainer.defaultAtoms())
+        val id = FoundationsTrainer.ATOM_LANDMARK_F3
+        val p = FoundationsTrainer.Prompt(id, 53, "", false, FoundationsTrainer.RENDER_STAFF)
+        repeat(10) { day -> t.recordResults(List(4) { hit(p) }, dayIndex = day) }
+        assertEquals("a landmark has one pitch; there is no ladder", 0, t.atoms.getValue(id).rung)
+    }
+
+    @Test
+    fun letterAtomsKeepTheirLadderAfterTheStaffAtomsLand() {
+        val t = FoundationsTrainer(atomDefs = FoundationsTrainer.defaultAtoms())
+        assertEquals(t.config.maxRung, t.atoms.getValue("find-C").maxRung)
+        assertEquals(t.config.maxRung, t.atoms.getValue(FoundationsTrainer.ATOM_OCTAVES).maxRung)
+    }
+
+    @Test
+    fun aSavedBlobCannotResurrectAnOldLadderShape() {
+        val t = FoundationsTrainer(atomDefs = FoundationsTrainer.defaultAtoms())
+        val blob = t.serialize()
+        val restored = FoundationsTrainer(blob, atomDefs = FoundationsTrainer.defaultAtoms())
+        assertEquals(0, restored.atoms.getValue(FoundationsTrainer.ATOM_LANDMARK_C4).maxRung)
+        assertEquals(t.config.maxRung, restored.atoms.getValue("find-G").maxRung)
+    }
+
+    @Test
+    fun sittingOneIsNotationFromTheFirstPrompt() {
+        // SPEC §4a-F: the terminal capability is reading, so it must not arrive
+        // at 87.5% of the way through the module. A brand new learner's very
+        // first drill is staff prompts and nothing else.
+        val t = FoundationsTrainer()
+        val d = t.previewDrill()!!
+        assertTrue(
+            "the first drill must FOCUS on notation",
+            FoundationsTrainer.LANDMARK_ATOMS.contains(d.focusAtom),
+        )
+        val notated = d.prompts.count { it.render == FoundationsTrainer.RENDER_STAFF }
+        assertTrue(
+            "notation must dominate the first drill, saw $notated/${d.prompts.size}",
+            notated > d.prompts.size / 2,
+        )
     }
 }

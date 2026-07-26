@@ -81,6 +81,38 @@ Corrective feedback therefore comes only AFTER the attempt: hold 4s, then light
 the anchoring black-key group (2-group for C/D/E, 3-group for F/G/A/B) — the
 landmark rule shown, not restated as text. A revealed prompt earns nothing.
 
+### Notation is the task, letter names are the scaffold (SPEC §4a-F)
+
+The trainer's original shape — "press F", find the white key — trained an
+intermediate representation that fluent readers bypass, and made note names the
+gate that §4 says they must never be. The correction is not to bolt a reading
+module on afterwards. Part-task training splits into fractionation, segmentation
+and simplification, and fractionation produces **negative** transfer when the
+components fire simultaneously in the whole task (Wickens et al. 2013). Piano is
+the paradigm simultaneous-component task, so a "note names now, reading later"
+module is the one shape the evidence forbids.
+
+What ships instead: every drill is the real task — read a notated pitch, play it
+— with one axis simplified to triviality. The first axis simplified is note
+count. Three landmark atoms (`landmark-c4`, `landmark-g4`, `landmark-f3`) each
+show a single notehead on a real five-line staff with a real clef, and nothing
+in words. They are deliberately **first** in the curriculum list, because the
+drill draws its focus and its padding from the front of that list: reading is
+present in the very first drill of the very first sitting, not at 87.5% of the
+module.
+
+Two mechanical consequences worth knowing:
+- A landmark is one fixed pitch, so it carries no octave ladder (`maxRung = 0`)
+  and the "evidence beyond the home octave" clause in `mastered()` is waived for
+  it — otherwise these atoms could never be completed at all.
+- A staff position names exactly one pitch, so `matchAnyOctave` is always false
+  for a staff prompt. The any-octave slack exists only because a worded "F"
+  prompt would otherwise demand an octave digit the learner has not been taught.
+
+Middle C alternates clef per prompt on purpose: the reason it is *the* anchor is
+that it is the same ledger line seen from either side, and a prompt that only
+ever arrives in treble never teaches that.
+
 ### Config parameters and their rationale
 
 | Parameter | Default | Rationale |
@@ -167,6 +199,15 @@ Design choices from ADHD research that DID survive:
 
 ## Change log
 
+- 2026-07 (fundamentals module, F1): staff rendering shipped. `core/notation/Staff`
+  computes diatonic staff positions and ledger lines as pure, unit-tested math;
+  `StaffRenderer` turns them into pixels with four Bravura glyphs (SMuFL, SIL
+  OFL). Three landmark atoms now pose their prompt as notation with no words,
+  and they lead the curriculum so reading is present from sitting one. Two
+  engine changes were required and are load-bearing: per-atom ladder ceilings
+  (`AtomStats.maxRung`, seeded from the curriculum after deserialization so a
+  saved blob cannot resurrect an old ladder shape) and the waiver of the
+  beyond-home-octave mastery clause for pinned-pitch atoms.
 - 2026-07: Initial architecture. Foundations trainer added after user
   feedback (basics gap); ladder restructured to single-axis steps after log
   analysis showed multi-axis promotion cliffs; promotion requires two

@@ -110,6 +110,29 @@ class NoteHighwayView(
     /** Per-chart-note prompt text override, e.g. "F" at rung 0 vs "F4" beyond. */
     var promptLabels: Array<String>? = null
 
+    /**
+     * Per-prompt render mode (SPEC §4a-F). A [RENDER_STAFF] prompt is drawn as
+     * notation and says nothing in words: the staff IS the question. Null means
+     * every prompt is a worded one.
+     */
+    var promptRender: ByteArray? = null
+
+    /** Per-prompt clef for staff prompts; ignored for worded ones. */
+    var promptClef: ByteArray? = null
+
+    /** Built lazily on the first staff prompt so text-only runs never load a font. */
+    private var staffRenderer: StaffRenderer? = null
+
+    private fun renderOf(i: Int): Int {
+        val r = promptRender ?: return RENDER_TEXT
+        return if (i in r.indices) r[i].toInt() else RENDER_TEXT
+    }
+
+    private fun clefOf(i: Int): Int {
+        val c = promptClef ?: return 0
+        return if (i in c.indices) c[i].toInt() else 0
+    }
+
     /** Suppress the live accuracy/miss/extra/combo HUD (evaluative verdict). */
     var showHud = true
 
@@ -314,6 +337,13 @@ class NoteHighwayView(
     override fun onAttachedToWindow() {
         super.onAttachedToWindow()
         running = true
+        // Font loading is I/O, so it happens here and never in the frame loop
+        // (SPEC §1) — and only when this run actually contains notation.
+        if (staffRenderer == null &&
+            promptRender?.any { it.toInt() == RENDER_STAFF } == true
+        ) {
+            staffRenderer = StaffRenderer(context)
+        }
         restart()
         Choreographer.getInstance().postFrameCallback(this)
     }
@@ -552,10 +582,14 @@ class NoteHighwayView(
             drawDrillProgress(canvas)
         }
         if (waitingNow) {
-            canvas.drawText(
-                waitPrompt, 0, waitPrompt.length,
-                width * 0.42f, keyboardTop - 60f, bigPaint,
-            )
+            if (renderOf(waitPromptIdx) == RENDER_STAFF) {
+                drawStaffPrompt(canvas, waitPromptIdx)
+            } else {
+                canvas.drawText(
+                    waitPrompt, 0, waitPrompt.length,
+                    width * 0.42f, keyboardTop - 60f, bigPaint,
+                )
+            }
         }
         if (ended) {
             canvas.drawText(endLine1, 0, endLine1.length, width * 0.30f, height * 0.38f, bigPaint)
@@ -742,6 +776,23 @@ class NoteHighwayView(
 
     // ------------------------------------------------------------------ HUD / logs
 
+    /**
+     * The notated prompt. Sized off the playfield rather than fixed pixels so
+     * the staff stays the same physical size as the highway on any display.
+     */
+    private fun drawStaffPrompt(canvas: Canvas, i: Int) {
+        val renderer = staffRenderer ?: return
+        renderer.draw(
+            canvas = canvas,
+            midi = notes[i].midiNote,
+            clef = clefOf(i),
+            centerX = width * 0.5f,
+            centerY = keyboardTop * 0.45f,
+            staffSpace = keyboardTop * 0.055f,
+            staffWidth = width * 0.30f,
+        )
+    }
+
     /** Segmented remaining-prompt bar: position in the drill, no verdict. */
     private fun drawDrillProgress(canvas: Canvas) {
         val total = notes.size
@@ -846,6 +897,8 @@ class NoteHighwayView(
         private const val WRONG_FLASH_NANOS = 450_000_000L
         private const val REC_CAPACITY = 4096
         private const val WRONG_CAPACITY = 256
+        private const val RENDER_TEXT = com.fingerly.core.session.FoundationsTrainer.RENDER_TEXT
+        private const val RENDER_STAFF = com.fingerly.core.session.FoundationsTrainer.RENDER_STAFF
         private val LETTERS =
             arrayOf("C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B")
     }

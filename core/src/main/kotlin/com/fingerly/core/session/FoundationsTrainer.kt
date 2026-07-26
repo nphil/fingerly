@@ -1,5 +1,6 @@
 package com.fingerly.core.session
 
+import com.fingerly.core.notation.Staff
 import com.fingerly.core.song.ChartNote
 import com.fingerly.core.song.Score
 import kotlin.random.Random
@@ -58,6 +59,20 @@ class FoundationsTrainer(
         val id: String,
         val label: String,
         val introTip: String,
+        /**
+         * How the prompt is posed. [RENDER_TEXT] names the key in words;
+         * [RENDER_STAFF] draws it on a real staff and says nothing (SPEC §4a-F:
+         * every drill is the real task with one axis simplified, and the axis
+         * simplified here is "how many notes" — one — not "is it notated").
+         */
+        val render: Int = RENDER_TEXT,
+        /** Which clef a staff prompt is drawn in; [Staff.CLEF_EITHER] alternates. */
+        val clef: Int = Staff.CLEF_TREBLE,
+        /**
+         * Octave-pool ladder depth for this atom; -1 takes [Config.maxRung].
+         * 0 pins the atom to a single fixed pitch — which is what a landmark IS.
+         */
+        val maxRung: Int = -1,
         /** (rng, rung) → midi note. Rung widens the octave pool, not the answer space. */
         val promptNote: (Random, Int) -> Int,
     )
@@ -78,6 +93,14 @@ class FoundationsTrainer(
         var rung = 0
         var promptsAtRung = 0
         var unaidedAtRung = 0
+
+        /**
+         * Ladder ceiling for THIS atom, seeded from its definition (not
+         * serialized — the curriculum owns it). 0 means the atom has a single
+         * fixed pitch, so "evidence outside the home octave" cannot exist and
+         * must not be demanded, or the atom could never be mastered.
+         */
+        var maxRung = config.maxRung
 
         // Decayed error rates (Galyardt & Goldin): recent behavior, not lifetime.
         var octaveRate = 0f
@@ -102,7 +125,9 @@ class FoundationsTrainer(
          * and cold success on separate days.
          */
         fun mastered(): Boolean =
-            atCriterion() && hitsBeyondHomeOctave() >= 1 && daysCredited >= config.criterionDays
+            atCriterion() &&
+                (maxRung == 0 || hitsBeyondHomeOctave() >= 1) &&
+                daysCredited >= config.criterionDays
 
         /** How many more unaided hits are wanted in this sitting, 0 when done. */
         fun hitsWantedToday(): Int =
@@ -170,15 +195,23 @@ class FoundationsTrainer(
     class Prompt(
         val atomId: String,
         val midiNote: Int,
-        /** Exactly what is being asked: "any F" at rung 0, "F4" once octaves count. */
+        /**
+         * Exactly what is being asked: "any F" at rung 0, "F4" once octaves
+         * count. Empty for a staff prompt — the notation IS the question, and
+         * printing the letter beside it would turn a read back into a recall.
+         */
         val label: String,
         /**
          * True when any octave of this letter is correct. At the home rung the
          * skill is "which white key is an F" — the octave digit would demand a
          * skill the octaves atom has not taught yet, so asking for it (and
-         * grading it) would be asking the learner to guess.
+         * grading it) would be asking the learner to guess. Always false for a
+         * staff prompt: a staff position names exactly one pitch.
          */
         val matchAnyOctave: Boolean,
+        val render: Int = RENDER_TEXT,
+        /** Resolved clef — never [Staff.CLEF_EITHER]; the drill has picked one. */
+        val clef: Int = Staff.CLEF_TREBLE,
     )
 
     class Drill(
@@ -231,6 +264,12 @@ class FoundationsTrainer(
                     else -> if (id in atoms) atoms[id] = AtomStats.deserialize(value, config)
                 }
             }
+        }
+        // Seed per-atom ladder ceilings AFTER deserialization: the curriculum
+        // owns them, so a saved blob must never resurrect an old ladder shape.
+        for (def in atomDefs) {
+            atoms.getValue(def.id).maxRung =
+                if (def.maxRung >= 0) def.maxRung else config.maxRung
         }
     }
 
@@ -304,11 +343,28 @@ class FoundationsTrainer(
         val ordered = spaceOut(ids, config.minGapBetweenSameAtom, rng)
         val prompts = ordered.map { id ->
             val st = atoms.getValue(id)
-            val note = defsById.getValue(id).promptNote(rng, st.rung)
+            val def = defsById.getValue(id)
+            val note = def.promptNote(rng, st.rung)
             // The octaves atom exists to test octave discrimination, so it always
-            // names and requires a specific one.
-            val anyOctave = st.rung == 0 && id != ATOM_OCTAVES
-            Prompt(id, note, labelFor(note, anyOctave), anyOctave)
+            // names and requires a specific one; a staff position already does.
+            val anyOctave =
+                st.rung == 0 && st.maxRung > 0 && id != ATOM_OCTAVES &&
+                    def.render != RENDER_STAFF
+            val clef = when (def.clef) {
+                // Middle C's whole point is that it is the SAME ledger line from
+                // either side, so its prompt must arrive from either side.
+                Staff.CLEF_EITHER ->
+                    if (rng.nextBoolean()) Staff.CLEF_TREBLE else Staff.CLEF_BASS
+                else -> def.clef
+            }
+            Prompt(
+                atomId = id,
+                midiNote = note,
+                label = if (def.render == RENDER_STAFF) "" else labelFor(note, anyOctave),
+                matchAnyOctave = anyOctave,
+                render = def.render,
+                clef = clef,
+            )
         }
         return Drill(
             focusAtom = focus,
@@ -379,7 +435,7 @@ class FoundationsTrainer(
             val st = atoms.getValue(id)
             if (st.promptsAtRung < config.minPromptsPerRungStep) continue
             val rate = st.rungSuccess()
-            if (rate >= config.stepUpAt && st.rung < config.maxRung) {
+            if (rate >= config.stepUpAt && st.rung < st.maxRung) {
                 st.rung++
                 st.promptsAtRung = 0
                 st.unaidedAtRung = 0
@@ -442,6 +498,19 @@ class FoundationsTrainer(
 
         const val ATOM_OCTAVES = "octaves"
 
+        /** Prompt is a sentence naming a key ("any F", "F4"). */
+        const val RENDER_TEXT = 0
+
+        /** Prompt is a notated pitch on a five-line staff, with no words. */
+        const val RENDER_STAFF = 1
+
+        const val ATOM_LANDMARK_C4 = "landmark-c4"
+        const val ATOM_LANDMARK_G4 = "landmark-g4"
+        const val ATOM_LANDMARK_F3 = "landmark-f3"
+
+        /** The three anchors every other staff position is measured against. */
+        val LANDMARK_ATOMS = listOf(ATOM_LANDMARK_C4, ATOM_LANDMARK_G4, ATOM_LANDMARK_F3)
+
         /** Minimum map to read any prompt; gates the song side only. */
         val SONG_GATE_ATOMS = listOf("find-C", "find-F", "find-G")
 
@@ -490,6 +559,36 @@ class FoundationsTrainer(
                 Triple("B", "B is the white key just RIGHT of a 3-group.", 11),
             )
             val atoms = ArrayList<AtomDef>()
+            // SPEC §4a-F: the three staff landmarks, and they come FIRST.
+            // Each is the whole task — read a notated pitch, play it — with the
+            // note count simplified to one. They carry no ladder: a landmark IS
+            // one fixed pitch. Order is load-bearing: the drill picks its focus
+            // and its padding from the front of this list, so putting notation
+            // first is what makes reading present from sitting one rather than
+            // arriving once the letter drills are done.
+            atoms.add(
+                AtomDef(
+                    ATOM_LANDMARK_C4, "Middle C on the staff",
+                    "Middle C is the short ledger line BETWEEN the two staves — just below the treble staff, just above the bass staff.",
+                    render = RENDER_STAFF, clef = Staff.CLEF_EITHER, maxRung = 0,
+                ) { _, _ -> 60 },
+            )
+            atoms.add(
+                AtomDef(
+                    ATOM_LANDMARK_G4, "Treble G on the staff",
+                    "The treble clef curls around one line: that line is G, the fourth white key above middle C.",
+                    render = RENDER_STAFF, clef = Staff.CLEF_TREBLE, maxRung = 0,
+                ) { _, _ -> 67 },
+            )
+            atoms.add(
+                AtomDef(
+                    ATOM_LANDMARK_F3, "Bass F on the staff",
+                    "The bass clef's two dots straddle one line: that line is F, the fourth white key below middle C.",
+                    render = RENDER_STAFF, clef = Staff.CLEF_BASS, maxRung = 0,
+                ) { _, _ -> 53 },
+            )
+            // Letter-name key finding: the scaffold UNDER the staff prompts, not
+            // the goal (SPEC §4: names are optional, late, never a gate).
             for ((letter, tip, semitone) in letters) {
                 atoms.add(
                     AtomDef("find-$letter", "Find $letter", tip) { rng, rung ->

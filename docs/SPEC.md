@@ -288,6 +288,102 @@ the user imports via the existing MusicXML import flow (§5).
 
 ---
 
+## 4a-F. Fundamentals Module — scope and definition of done (2026-07)
+
+The roadmap amendment above makes this module the whole project until it ships.
+Its constraint was an *enumerable* definition of done. This section is it.
+
+### The governing rule
+
+**Every drill in this module is a complete instance of the real task — read a
+notated thing and play it in time — with ONE axis simplified to triviality.
+Never a component removed.**
+
+This is not stylistic. Part-task training splits three ways (Wickens et al. 2013,
+meta-analysis of part-task transfer): *fractionation* trains components
+separately, *segmentation* trains consecutive chunks, *simplification* trains the
+whole task with a parameter reduced. Fractionation produces **negative** transfer
+when the components occur simultaneously in the whole task, and piano is the
+paradigm simultaneous-component task — pitch, rhythm, and two hands all fire at
+once. A conventional "fundamentals module" (note names here, rhythm there, hands
+later) is fractionation. Segmentation and simplification are licensed; nothing
+else is.
+
+Concretely: a drill may make the rhythm trivial (one note, held until played), or
+the pitch set trivial (one landmark), or the hand count trivial (one hand). It may
+not train "note names" as a thing detached from playing them, and it may not train
+"clapping rhythms" as a thing detached from notes.
+
+### The terminal item is present from sitting one
+
+Definition of done is a **cold read**: an unseen 4-bar excerpt in the C3–G4 span,
+notation only, no scaffold, played hands-together at a stated slow tempo.
+
+That item is measured from the *first* sitting, before any of it is learnable, and
+every sitting after. It is a probe, never a gate — failing it costs nothing and
+unlocks nothing. Two reasons: it is the only measurement that is not a proxy, and
+it makes the module's own progress visible from day one rather than at the end,
+which is the failure mode §2.7 exists to design around.
+
+### Build order (reading first, deliberately)
+
+Ordering is the load-bearing decision here. Reading is the *point* of the module,
+so it ships in the first push, not the fifth. A build where reading lands at item
+5 of 8 puts this project at "87.5% done, terminal capability not yet started" —
+which is exactly the shape of the abandonment this module was created to prevent.
+
+| # | Item | Ships |
+|---|---|---|
+| F0 | This section | with F1 |
+| F1 | `StaffRenderer` + landmark atoms (C4, G4, F3) read off a real staff in wait mode | first |
+| F2 | `staff-direction` (up on the staff = right on the keyboard) and `span-9` (every note in C3–G4), scaffold fade via `scaffoldAlpha` | second |
+| F3 | Cold-read probe wired in and logged every sitting | third |
+| F4 | Rhythm — **gated on the paced-tapping probe below** | conditional |
+| F5 | Hands together — scored only where the two parts are ≥14 semitones apart | fifth |
+| F6 | Graduation bridge: the module *becomes* the song path, it does not unlock one | last |
+
+### Definition of done (all five, no partial credit)
+
+1. Cold read of an unseen 4-bar C3–G4 excerpt, ≥90% correct pitches, no scaffold,
+   on **3 distinct days**.
+2. That read is hands-together where the excerpt is hands-together.
+3. Timing is within the wait-free window at the stated tempo — i.e. the read is
+   played *in time*, not spelled out.
+4. No atom in the module is above `scaffoldAlpha = 0` at the time of the read.
+5. The cold-read score is not the best of N. It is the first attempt of the sitting.
+
+When all five hold, the module is done and the song path is the app.
+
+### Falsification check (run it, believe it)
+
+Regress cold-read accuracy on "atoms brought to criterion". If bringing atoms to
+criterion does not predict the terminal item, **the atoms are wrong — delete
+them.** Do not respond by adding more atoms. This check exists because a mastery
+map that certifies skills the terminal item does not need is precisely the defect
+that made the previous foundations trainer measure visual tracking.
+
+### Two safety findings that bind the build
+
+- **Do not build F4 (rhythm) on assumption.** Beat-tracking deficits in ADHD are
+  large on average (Puyjarinet et al., d ≈ 1.19–1.39) but ~38% of ADHD adults are
+  unimpaired. F4 is the largest and hardest chunk of the module; spending it on a
+  non-problem is the single most expensive mistake available here. Ship a paced
+  tapping probe first and read the result.
+- **Do not score hands-together on close voicing.** MIDI carries pitch, not hands.
+  When the two parts are within ~13 semitones, "both hands" is unobservable —
+  one hand can play the lot. Restricting scoring to parts ≥14 semitones apart is
+  what keeps F5 from repeating the mistake that got the fingering atoms deleted
+  (certifying an unobserved skill, §2.8).
+
+### What this module explicitly does not add
+
+Note-name naming as an end in itself (§4: names are "optional, late, never a
+gate"), solfège, theory prerequisites (§2.1), interval *arithmetic* detached from
+playing, or a placement test. Letter-name key-finding survives only as the
+scaffold under a staff prompt, and fades to zero before done is claimable.
+
+---
+
 ## 8a. Learner Model (user-directed addition, 2026-07)
 
 The crux of the app: it continuously builds a profile of THIS user from every
