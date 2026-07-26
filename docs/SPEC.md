@@ -300,23 +300,80 @@ notated thing and play it in time — with ONE axis simplified to triviality.
 Never a component removed.**
 
 This is not stylistic. Part-task training splits three ways: *fractionation*
-trains components separately, *segmentation* trains consecutive chunks,
-*simplification* trains the whole task with a parameter reduced. Fractionation is
-held to produce **negative** transfer when the components occur simultaneously in
-the whole task, and piano is the paradigm simultaneous-component task — pitch,
-rhythm, and two hands all fire at once. A conventional "fundamentals module"
-(note names here, rhythm there, hands later) is fractionation. Segmentation and
-simplification are licensed; nothing else is.
+trains in isolation components normally performed together, *segmentation*
+trains consecutive chunks, *simplification* trains the whole task with one
+parameter reduced (Wightman & Lintern 1985). A meta-analysis of 37 transfer
+studies found part-task training "generally produced negative transfer when the
+parts were performed concurrently in the whole transfer task but not when the
+parts were performed in sequence" (Wickens, Hutchins, Carolan & Cumming 2013).
+Piano is a paradigm concurrent-component task — pitch, rhythm and two hands fire
+at once. A conventional "fundamentals module" (note names here, rhythm there,
+hands later) is fractionation of concurrent components: the case that result
+singles out.
 
-> **Citation status: UNVERIFIED.** This rule was attributed to Wickens et al.
-> 2013 on part-task transfer. A verification pass over the 129 findings in
-> `docs/RESEARCH.md` and `docs/RESEARCH-GAMIFICATION.md` found no such entry —
-> the only Wickens present is Tripp & Wickens 2008 on dopamine transfer deficit,
-> a different author and topic. Under `RESEARCH.md`'s own rule (only CONFIRMED
-> findings at MODERATE or STRONG may drive a decision) this rule is currently
-> unsupported. It is **kept** because it produced the F1 design and that design
-> is sound on its own terms, but it must be verified or restated on a confirmed
-> basis before F4 — the item whose entire shape it dictates — is built.
+**The operational test.** The rule is unusable without one, because "one hand" is
+fractionation under the taxonomy and this section licenses it. A drill is
+SIMPLIFICATION if the whole loop — read a notated symbol → produce it on the
+keyboard → in time — is intact and one parameter's *range* is reduced. It is
+FRACTIONATION if any of the three links is absent. Under this test: one hand is
+simplification (loop intact, hand count reduced to 1); rhythm on one fixed pitch
+is simplification (loop intact, pitch range reduced to 1); clapping rhythms is
+fractionation (no notehead → key production); note-name flashcards is
+fractionation (no in-time production). Apply the test, not the label.
+
+**Three conditions from the same abstract, all binding.**
+
+1. **Simplification must be adaptive, never stepped.** "ID training was
+   successful when the increases were implemented adaptively but not when
+   increased in fixed steps." Independent support for closed-loop difficulty
+   (§3); it forbids F4 shipping a fixed rhythm ladder. It says nothing about the
+   85% set-point, which remains contested on its own evidence.
+
+2. **Variable priority is licensed.** "Variable-priority training of the whole
+   task was a successful technique … PTT can be successful if the integrated
+   parts are varied in the priority they are given to the learner." Keep the
+   complete task and shift which axis is scored — rhythm this pass, pitch the
+   next. This removes nothing, so it needs no license; the only edit required is
+   that "with ONE axis simplified to triviality" must not be read as *requiring*
+   every drill to simplify something. An unsimplified whole-task block with
+   varied scoring priority is legal.
+
+3. **The penalty is smallest for beginners, so this is a default, not a law.**
+   "Both strategies provided evidence that experienced learners benefited less,
+   or suffered more, from the strategy." This user is a complete beginner — the
+   population the evidence says part-task training harms least. The rule is
+   applied here at the weakest point in the paper's own moderator space. It is a
+   strong default that a measured result may override. It is never a reason not
+   to measure.
+
+> **Citation status: CONFIRMED · MODERATE as applied.** Wickens, C. D., Hutchins,
+> S., Carolan, T., & Cumming, J. (2013). Effectiveness of part-task training and
+> increasing-difficulty training strategies: A meta-analysis approach. *Human
+> Factors*, 55(2), 461–470. doi:10.1177/0018720812451994, PMID 23691838.
+> Verified 2026-07 against the NCBI record; every quotation above is verbatim
+> from the published abstract. **The previous UNVERIFIED flag was a records
+> error** — the finding had never been entered in `docs/RESEARCH.md`, and
+> "absent from our notes" was read as "does not exist".
+>
+> Taxonomy attribution: Wightman, D. C., & Lintern, G. (1985). Part-task training
+> for tracking and manual control. *Human Factors*, 27(3), 267–283.
+> doi:10.1177/001872088502700304 — not Wickens, who inherits it.
+>
+> **Magnitude:** the full text is paywalled and only the abstract was obtained.
+> Every result is directional, with no pooled effect size, no CI and no subgroup
+> *k*. Cite the direction; never attach a number.
+>
+> **Domain, and the one in-domain study, which runs the other way.** This is a
+> human-factors transfer literature. The one part-task study located in a music
+> domain is Ash, D. W., & Holding, D. H. (1990). Backward versus forward chaining
+> in the acquisition of a keyboard skill. *Human Factors*, 32(2), 139–146.
+> doi:10.1177/001872089003200202 — a musical keyboard task in which both chaining
+> (segmentation) methods beat whole-task training during training, on criterion
+> trials, and at one-week retention, with forward chaining ahead of backward. It
+> supports segmentation, and it does not support any claim that backward chaining
+> is the stronger form. The step from tracking tasks to reading notation at a
+> keyboard remains inference from shared task structure, and it is the weakest
+> link in this rule.
 
 Concretely: a drill may make the rhythm trivial (one note, held until played), or
 the pitch set trivial (one landmark), or the hand count trivial (one hand). It may
@@ -391,11 +448,18 @@ that made the previous foundations trainer measure visual tracking.
 
 ### Two safety findings that bind the build
 
-- **Do not build F4 (rhythm) on assumption.** Beat-tracking deficits in ADHD are
-  large on average (Puyjarinet et al., d ≈ 1.19–1.39) but ~38% of ADHD adults are
-  unimpaired. F4 is the largest and hardest chunk of the module; spending it on a
-  non-problem is the single most expensive mistake available here. Ship a paced
-  tapping probe first and read the result.
+- **Do not build F4 (rhythm) on assumption — but do not gate it on the probe
+  either.** The premise was overstated: Puyjarinet's d ≈ 1.19–1.39 is two adult
+  measures, n = 21 and 18, one lab, and the "~38% unimpaired" figure rests on
+  about 8 people (95% CI roughly 21–59%). No number that wide can gate the
+  largest item in the module. What a paced-tapping probe actually buys is
+  narrower and worth having: a **window constant** derived from this learner's
+  own timing spread, a **maximum F4 tempo** (shortest notated inter-onset
+  interval ≥ 6.25 × σ_read), and **one design fork** — whether the cold read's
+  timing spread is reading latency or the hand. It is entirely within-subject:
+  no published adult norm survives the change of effector from touchscreen to
+  weighted key. Run it five times, immediately after the cold read, take the
+  median, then retire it. It is not a progress measure.
 - **Do not score hands-together on close voicing.** MIDI carries pitch, not hands.
   When the two parts are within ~13 semitones, "both hands" is unobservable —
   one hand can play the lot. Restricting scoring to parts ≥14 semitones apart is

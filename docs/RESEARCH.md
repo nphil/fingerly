@@ -954,3 +954,45 @@ Two runners-up. (a) **No lag constraint on prompt order.** `prompts.shuffle(rng)
 
 **Drop change 8 (the placement test).** Its citation does not cover cold placement, it removes the only escape hatch before the dead-end fix is proven on device, it seeds `todayHits` from 1–2 observations in direct contradiction of change 5's "counts must be earned," and it is a menu before playing. If he is already competent, change 3's rung ladder plus change 7's stopping rule will move him through rung 0 in two sittings anyway — that is the placement test, for free.
 
+---
+
+## Addendum, 2026-07: part-task training (entered late)
+
+These three were missing from this file entirely, which is how SPEC §4a-F's
+governing rule came to be flagged UNVERIFIED — a verification pass read "absent
+from our notes" as "does not exist". The silent record was the bug. Full
+statement and the operational test derived from them are in SPEC §4a-F.
+
+**PT-1 · Wickens, Hutchins, Carolan & Cumming (2013).** *Effectiveness of
+part-task training and increasing-difficulty training strategies: A
+meta-analysis approach.* Human Factors 55(2), 461–470.
+doi:10.1177/0018720812451994 · PMID 23691838.
+Meta-analysis, 37 transfer studies. Verbatim: part-task training "generally
+produced negative transfer when the parts were performed concurrently in the
+whole transfer task but not when the parts were performed in sequence";
+"variable-priority training of the whole task was a successful technique"; "ID
+training was successful when the increases were implemented adaptively but not
+when increased in fixed steps"; "both strategies provided evidence that
+experienced learners benefited less, or suffered more, from the strategy".
+Status: **CONFIRMED · MODERATE as applied.** Abstract verified against the NCBI
+record; full text paywalled, so every result is directional — no pooled effect
+size, no CI, no subgroup k. Attach no number to it. The step from manual-control
+transfer to reading notation at a keyboard is inference from shared task
+structure and is the weakest link.
+
+**PT-2 · Wightman & Lintern (1985).** *Part-task training for tracking and manual
+control.* Human Factors 27(3), 267–283. doi:10.1177/001872088502700304.
+Source of the fractionation / segmentation / simplification taxonomy, which
+SPEC previously misattributed to Wickens. Status: **CONFIRMED · STRONG** for the
+taxonomy itself.
+
+**PT-3 · Ash & Holding (1990).** *Backward versus forward chaining in the
+acquisition of a keyboard skill.* Human Factors 32(2), 139–146.
+doi:10.1177/001872089003200202.
+The only located part-task study in a **music** domain: a musical keyboard task
+scored for melodic errors and rhythmic accuracy. Both chaining (segmentation)
+methods beat whole-task training during training, on criterion trials of the
+whole task, and at one-week retention; forward chaining ahead of backward on
+most measures. Status: **CONFIRMED · MODERATE.** It runs *toward* part-task
+methods in the one domain that matters here, and it falsifies any claim that
+backward chaining is the stronger form.
