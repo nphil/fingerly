@@ -14,11 +14,12 @@ package com.fingerly.app.ui
 object TestingBrief {
 
     /** Shown so a stale brief is visible as stale. */
-    const val BUILD = "F5b — reachable cold-read floor, hand position, new home screen"
+    const val BUILD = "F5c — guided first run, reachable cold-read floor, hand position"
 
     /** The concrete ask. One line each, imperative, no preamble. */
     val doThis = listOf(
-        "Set your hands first — the picture under the button. Right thumb on middle C, one finger per white key.",
+        "First run walks you through finding middle C, treble G and bass F on your own piano. Five steps, each one waits for you to actually press the key. Redo it any time from Basics.",
+        "Set your hands from the picture: right thumb on middle C, one finger per white key.",
         "One cold read per sitting. The first ones are four long notes on the landmarks, so you should be able to get some of them. Expect to miss plenty.",
         "Then one or two drills. Stop when the app says done for today.",
         "Most days beats long days. Spacing is the mechanism; a marathon session does nothing a short one would not.",

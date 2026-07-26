@@ -128,6 +128,12 @@ fun FingerlyApp(
                     // stopped, which is the single best-evidenced UI finding in
                     // the record (Ghibellini & Meier: resumption holds,
                     // unfinished-progress framing does not).
+                    // Zero-experience first run: establish the page ↔ key mapping
+                    // the whole module assumes, with every step verified by a real
+                    // press. Once only; re-openable from Basics.
+                    var oriented by remember {
+                        mutableStateOf(prefs.getBoolean(PREF_ORIENTATION_DONE, false))
+                    }
                     var path by remember {
                         mutableStateOf(prefs.getString(PREF_LAST_PATH, PATH_BASICS))
                     }
@@ -135,11 +141,20 @@ fun FingerlyApp(
                         prefs.edit().putString(PREF_LAST_PATH, next).apply()
                         path = next
                     }
-                    if (path != PATH_SONG) {
+                    if (!oriented) {
+                        OrientationScreen(
+                            engine = engine,
+                            onDone = {
+                                prefs.edit().putBoolean(PREF_ORIENTATION_DONE, true).apply()
+                                oriented = true
+                            },
+                        )
+                    } else if (path != PATH_SONG) {
                         FoundationsScreen(
                             engine = engine,
                             onCompleted = { goTo(PATH_SONG) },
                             onExit = { screen = Screen.Shell },
+                            onRedoSetup = { oriented = false },
                         )
                     } else {
                         SessionScreen(

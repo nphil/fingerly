@@ -47,7 +47,12 @@ import kotlinx.coroutines.launch
  * with the blunt summary after the drill (see docs/LEARNING.md for citations).
  */
 @Composable
-fun FoundationsScreen(engine: MidiEngine, onCompleted: () -> Unit, onExit: () -> Unit) {
+fun FoundationsScreen(
+    engine: MidiEngine,
+    onCompleted: () -> Unit,
+    onExit: () -> Unit,
+    onRedoSetup: () -> Unit = {},
+) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val repo = remember { SessionRepository(FingerlyDatabase.get(context)) }
@@ -405,6 +410,10 @@ fun FoundationsScreen(engine: MidiEngine, onCompleted: () -> Unit, onExit: () ->
                         OutlinedButton(onClick = { showHands = !showHands }) {
                             Text(if (showHands) "Hide hands" else "Hands")
                         }
+                        OutlinedButton(onClick = {
+                            prefs.edit().putBoolean(PREF_ORIENTATION_DONE, false).apply()
+                            onRedoSetup()
+                        }) { Text("Redo setup") }
                         OutlinedButton(onClick = { showBrief = !showBrief }) {
                             Text(if (showBrief) "Hide brief" else "What am I testing?")
                         }
