@@ -307,10 +307,6 @@ class FoundationsTrainer(
 
     fun allMastered(): Boolean = atoms.values.all { it.mastered() }
 
-    /** Atoms that gate the song side — the minimum map needed to read prompts. */
-    fun songGateOpen(): Boolean =
-        SONG_GATE_ATOMS.all { atoms[it]?.atCriterion() ?: true }
-
     fun masteryRows(): List<MasteryRow> = atomDefs.map { def ->
         val st = atoms.getValue(def.id)
         MasteryRow(
@@ -490,15 +486,31 @@ class FoundationsTrainer(
         return sb.toString()
     }
 
-    /** Named finish state for a sitting (SPEC §3.5). */
+    /**
+     * Named finish state for a sitting (SPEC §3.5), available at ANY point —
+     * not only once every atom's quota is exhausted. A learner who stops early
+     * is the normal case, and a finish state they can only reach by playing to
+     * exhaustion is a finish state they never see.
+     *
+     * It is a COUNT of work done, never a within-session quality score:
+     * within-session metrics actively mislead about retention (Karpicke &
+     * Roediger 2007; Papoušek et al.), so scoring the sitting would select for
+     * the worse schedule.
+     */
     fun sittingFinishLabel(): String {
-        val done = atomDefs.filter { atoms.getValue(it.id).todayHits > 0 }.map { it.label }
-        return if (done.isEmpty()) {
-            "No keys brought to criterion."
-        } else {
-            "${done.size} brought to criterion today: ${done.joinToString(", ")}"
+        val worked = atomDefs.filter { atoms.getValue(it.id).todayHits > 0 }
+        val hits = atoms.values.sumOf { it.todayHits }
+        if (worked.isEmpty()) return "Nothing banked yet today."
+        val creditedToday = atomDefs.count { atoms.getValue(it.id).lastCreditedDay == currentDay }
+        return buildString {
+            append("$hits banked today across ${worked.size} ")
+            append(if (worked.size == 1) "key" else "keys")
+            if (creditedToday > 0) append(" · $creditedToday earned a day")
         }
     }
+
+    /** True once every atom has met its quota for this sitting. */
+    fun sittingComplete(): Boolean = eligibleAtoms().isEmpty()
 
     /** Intro tip, once per atom, never repeated (SPEC §2.4 anti-wall-of-text). */
     private fun tipFor(atomId: String): String? {
@@ -531,9 +543,6 @@ class FoundationsTrainer(
 
         /** The three anchors every other staff position is measured against. */
         val LANDMARK_ATOMS = listOf(ATOM_LANDMARK_C4, ATOM_LANDMARK_G4, ATOM_LANDMARK_F3)
-
-        /** Minimum map to read any prompt; gates the song side only. */
-        val SONG_GATE_ATOMS = listOf("find-C", "find-F", "find-G")
 
         val LETTERS = arrayOf("C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B")
         val LETTER_SEMITONE = mapOf(

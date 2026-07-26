@@ -126,7 +126,6 @@ fun FoundationsScreen(engine: MidiEngine, onCompleted: () -> Unit, onExit: () ->
         }
         runningDrill = null
         version++
-        if (t.songGateOpen()) prefs.edit().putBoolean(PREF_FOUNDATIONS_DONE, true).apply()
     }
 
     val t = trainer
@@ -195,6 +194,14 @@ fun FoundationsScreen(engine: MidiEngine, onCompleted: () -> Unit, onExit: () ->
                     if (summary != null) {
                         Text(summary!!, color = Fg2, modifier = Modifier.widthIn(max = 760.dp))
                     }
+                    // The sitting's named finish state, always on screen. Stopping
+                    // early is the normal case, and a finish state only reachable
+                    // by exhaustion is one the learner never sees (SPEC §3.5).
+                    Text(
+                        remember(version) { t.sittingFinishLabel() },
+                        color = Mint2,
+                        modifier = Modifier.widthIn(max = 760.dp),
+                    )
                     if (next?.tip != null) {
                         Text(
                             next.tip!!,
@@ -219,14 +226,15 @@ fun FoundationsScreen(engine: MidiEngine, onCompleted: () -> Unit, onExit: () ->
                             }) { Text("${next.prompts.size} keys · ~60s") }
                         } else {
                             Text(
-                                t.sittingFinishLabel() + ". Nothing left today.",
+                                "Nothing left today.",
                                 color = Mint2,
                                 modifier = Modifier.widthIn(max = 700.dp),
                             )
                         }
-                        OutlinedButton(onClick = onCompleted) {
-                            Text(if (t.songGateOpen()) "Go to song" else "Songs anyway")
-                        }
+                        // Never gated. Basics are what the app serves by default;
+                        // the song path is always one tap away, and choosing it
+                        // sticks (SPEC §4: note names are never a gate).
+                        OutlinedButton(onClick = onCompleted) { Text("Go to song") }
                     }
                 }
             }
@@ -235,7 +243,10 @@ fun FoundationsScreen(engine: MidiEngine, onCompleted: () -> Unit, onExit: () ->
     }
 }
 
-const val PREF_FOUNDATIONS_DONE = "foundations_done"
+/** Which path the learner was last on. Resumption, not a gate. */
+const val PREF_LAST_PATH = "last_path"
+const val PATH_BASICS = "basics"
+const val PATH_SONG = "song"
 private const val SETTING_KEY = "foundations_trainer_state"
 private val Mint2 = Color(0xFF00E676)
 private val Amber2 = Color(0xFFFFB74D)

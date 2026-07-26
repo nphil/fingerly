@@ -140,7 +140,8 @@ class FoundationsTrainerTest {
             guard++
         }
         assertNull(t.previewDrill())
-        assertTrue(t.sittingFinishLabel().contains("brought to criterion"))
+        assertTrue(t.sittingComplete())
+        assertTrue(t.sittingFinishLabel().contains("banked today"))
         // A new day re-opens exactly the post-criterion quota.
         t.startSitting(1)
         assertNotNull(t.previewDrill())
@@ -272,15 +273,34 @@ class FoundationsTrainerTest {
     }
 
     @Test
-    fun songGateOpensOnCoreLettersOnly() {
+    fun nothingIsGatedOnLetterNames() {
+        // SPEC §4 — note names are "optional, late, never a gate" — and §4a-F
+        // exists because the trainer violated that by making them THE gate.
+        // The whole concept is deleted, not merely relaxed.
+        val src = java.io.File(
+            "src/main/kotlin/com/fingerly/core/session/FoundationsTrainer.kt",
+        ).readText()
+        assertFalse("songGateOpen must not come back", src.contains("songGateOpen"))
+        assertFalse("SONG_GATE_ATOMS must not come back", src.contains("SONG_GATE_ATOMS"))
+    }
+
+    @Test
+    fun theSittingPaysOutWhetherOrNotItIsExhausted() {
+        // The named finish state must be reachable by stopping, which is what
+        // actually happens — not only by playing every atom to its quota.
         val t = FoundationsTrainer()
-        assertFalse(t.songGateOpen())
-        for (id in FoundationsTrainer.SONG_GATE_ATOMS) {
-            val st = t.atoms.getValue(id)
-            repeat(t.config.sessionCriterionHits) { st.hitsAtRung[0]++ }
-        }
-        assertTrue("core letters at criterion must unlock songs", t.songGateOpen())
-        assertFalse("…without implying full mastery", t.allMastered())
+        t.startSitting(0)
+        assertTrue(t.sittingFinishLabel().contains("Nothing banked"))
+        assertFalse(t.sittingComplete())
+
+        val d = t.previewDrill()!!
+        t.startDrill(d)
+        t.recordResults(d.prompts.map { hit(it) }, dayIndex = 0)
+
+        val label = t.sittingFinishLabel()
+        assertTrue("must name work done, mid-sitting", label.contains("banked today"))
+        assertFalse("never a within-session quality score", label.contains("%"))
+        assertFalse(t.sittingComplete()) // atoms remain; the label still shows
     }
 
     @Test

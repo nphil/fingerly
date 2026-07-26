@@ -215,6 +215,34 @@ Design choices from ADHD research that DID survive:
 
 ## Change log
 
+- 2026-07 (roadmap reconciliation, F6a): two multi-agent passes — an end-to-end
+  audit of the beginner journey and a reconciliation of the roadmap against all
+  129 verified findings — agreed on one structural defect. **The 80% cliff had
+  been re-created inside the basics module**, three commits after `23738fc`
+  engineered it out of `SessionEngine`: an all-or-nothing payoff weeks away
+  (11 atoms × a ≥4-distinct-day floor each, plus 3 days of clean cold reads),
+  and no payoff today, because `sittingFinishLabel()` rendered only when
+  `previewDrill()` returned null — i.e. only if the learner exhausted every
+  atom's quota in one sitting. Stopping early, which is what actually happens,
+  produced no named finish at all, breaking SPEC §3.5 on the one path the
+  learner is on. The finish label is now unconditional and is a COUNT of work
+  done, never a within-session quality score (Karpicke & Roediger 2007;
+  Papoušek et al. — within-session metrics actively mislead about retention).
+  No points, badges or invented currency were added to compensate: Deci et al.
+  puts engagement-contingent rewards at d = −0.40 and informational verbal
+  feedback at d = +0.33.
+  Shipped with it: the letter-name song gate is deleted outright. `songGateOpen()`
+  keyed on find-C/find-F/find-G — the exact layer SPEC §4 calls "optional, late,
+  never a gate" and §4a-F demotes to fading scaffold — and it re-asserted on
+  every launch because the "Songs anyway" escape only mutated a remembered
+  local. Basics are now the *default* content, not a lock; the song path is
+  always one tap away and the choice persists. Resumption, not gating, is the
+  best-evidenced UI finding in the record (Ghibellini & Meier, recall ratio 0.99
+  across 37 studies: resumption holds, unfinished-progress framing does not).
+  Two F1 defects fixed in the same pass — demonstrations were being reported as
+  the learner's retrieval failures, and an unplugged piano was diagnosed as
+  "0/8 from memory" after ~100s of untouchable screen.
+
 - 2026-07 (fundamentals module, F1): staff rendering shipped. `core/notation/Staff`
   computes diatonic staff positions and ledger lines as pure, unit-tested math;
   `StaffRenderer` turns them into pixels with four Bravura glyphs (SMuFL, SIL

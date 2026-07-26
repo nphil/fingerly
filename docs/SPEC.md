@@ -299,15 +299,24 @@ Its constraint was an *enumerable* definition of done. This section is it.
 notated thing and play it in time — with ONE axis simplified to triviality.
 Never a component removed.**
 
-This is not stylistic. Part-task training splits three ways (Wickens et al. 2013,
-meta-analysis of part-task transfer): *fractionation* trains components
-separately, *segmentation* trains consecutive chunks, *simplification* trains the
-whole task with a parameter reduced. Fractionation produces **negative** transfer
-when the components occur simultaneously in the whole task, and piano is the
-paradigm simultaneous-component task — pitch, rhythm, and two hands all fire at
-once. A conventional "fundamentals module" (note names here, rhythm there, hands
-later) is fractionation. Segmentation and simplification are licensed; nothing
-else is.
+This is not stylistic. Part-task training splits three ways: *fractionation*
+trains components separately, *segmentation* trains consecutive chunks,
+*simplification* trains the whole task with a parameter reduced. Fractionation is
+held to produce **negative** transfer when the components occur simultaneously in
+the whole task, and piano is the paradigm simultaneous-component task — pitch,
+rhythm, and two hands all fire at once. A conventional "fundamentals module"
+(note names here, rhythm there, hands later) is fractionation. Segmentation and
+simplification are licensed; nothing else is.
+
+> **Citation status: UNVERIFIED.** This rule was attributed to Wickens et al.
+> 2013 on part-task transfer. A verification pass over the 129 findings in
+> `docs/RESEARCH.md` and `docs/RESEARCH-GAMIFICATION.md` found no such entry —
+> the only Wickens present is Tripp & Wickens 2008 on dopamine transfer deficit,
+> a different author and topic. Under `RESEARCH.md`'s own rule (only CONFIRMED
+> findings at MODERATE or STRONG may drive a decision) this rule is currently
+> unsupported. It is **kept** because it produced the F1 design and that design
+> is sound on its own terms, but it must be verified or restated on a confirmed
+> basis before F4 — the item whose entire shape it dictates — is built.
 
 Concretely: a drill may make the rhythm trivial (one note, held until played), or
 the pitch set trivial (one landmark), or the hand count trivial (one hand). It may
@@ -335,12 +344,30 @@ which is exactly the shape of the abandonment this module was created to prevent
 | # | Item | Ships |
 |---|---|---|
 | F0 | This section | with F1 |
-| F1 | `StaffRenderer` + landmark atoms (C4, G4, F3) read off a real staff in wait mode | first |
-| F2 | `staff-direction` (up on the staff = right on the keyboard) and `span-9` (every note in C3–G4), scaffold fade via `scaffoldAlpha` | second |
-| F3 | Cold-read probe wired in and logged every sitting | third |
+| F1 | `StaffRenderer` + landmark atoms (C4, G4, F3) read off a real staff in wait mode | shipped |
+| F6a | Delete the letter-name gate: basics become the **default**, never a lock | shipped |
+| F3 | Cold-read probe + paced-tapping probe, logged every sitting | next |
+| F2 | `staff-direction` (up on the staff = right on the keyboard) and `span-9` (every note in C3–G4), scaffold fade via `scaffoldAlpha` | then |
+| F5 | Hands together — scored only where the two parts are ≥14 semitones apart | then |
 | F4 | Rhythm — **gated on the paced-tapping probe below** | conditional |
-| F5 | Hands together — scored only where the two parts are ≥14 semitones apart | fifth |
-| F6 | Graduation bridge: the module *becomes* the song path, it does not unlock one | last |
+| F6b | Composer: basics and song work served into one session arc | last |
+
+**Reorder, 2026-07.** The original table shipped F3 third and F6 last, and both
+contradicted this section's own prose. Three corrections, all ordering — no scope
+cut, and the definition of done below is unchanged:
+
+- **F3 moves to the front.** The paragraph above says the cold read is "measured
+  from the *first* sitting", and the falsification check regresses cold-read
+  accuracy on atoms-brought-to-criterion. The low end of that predictor range —
+  few atoms at criterion — is being generated right now and cannot be
+  reconstructed later. It is the only irreversible item in the order.
+- **F6 splits.** Deleting the letter-name gate was pure deletion, not a bridge,
+  and the gate it removed was live in shipped code — keyed on find-C/find-F/find-G,
+  the exact layer §4 calls "never a gate". Holding that deletion until last kept a
+  spec-illegal gate alive through the largest item in the module. Only the
+  composer stays scheduled last.
+- **F5 before F4.** F5 is required by condition 2 of the definition of done. F4 is
+  conditional and droppable. Required before optional.
 
 ### Definition of done (all five, no partial credit)
 

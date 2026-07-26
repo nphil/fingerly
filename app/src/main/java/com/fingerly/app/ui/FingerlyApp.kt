@@ -22,7 +22,7 @@ import com.fingerly.app.midi.MidiEngine
 import com.fingerly.app.data.SongCatalog
 import kotlinx.coroutines.flow.StateFlow
 
-enum class Screen { Shell, Checklist, LatencyTest, VirtualPiano, Settings, Highway, Session, Dashboard, Library, Basics }
+enum class Screen { Shell, Checklist, LatencyTest, VirtualPiano, Settings, Highway, Session, Dashboard, Library }
 
 private val DarkScheme: ColorScheme = darkColorScheme(
     primary = Color(0xFF00E676),
@@ -83,7 +83,12 @@ fun FingerlyApp(
                     onOpenSession = { screen = Screen.Session },
                     onOpenDashboard = { screen = Screen.Dashboard },
                     onOpenLibrary = { screen = Screen.Library },
-                    onOpenBasics = { screen = Screen.Basics },
+                    onOpenBasics = {
+                        // Switching back to basics is symmetric with going to
+                        // songs: it changes the default, it does not lock anything.
+                        prefs.edit().putString(PREF_LAST_PATH, PATH_BASICS).apply()
+                        screen = Screen.Session
+                    },
                     songTitle = currentScore.title,
                 )
 
@@ -115,16 +120,25 @@ fun FingerlyApp(
                 )
 
                 Screen.Session -> {
-                    // Foundations gate: adaptive basics training before song
-                    // sessions (SPEC §2.5/§4/§8a). Passed checkpoint or skipped
-                    // → songs; re-run any time from the shell.
-                    var foundationsDone by remember {
-                        mutableStateOf(prefs.getBoolean(PREF_FOUNDATIONS_DONE, false))
+                    // NOT a gate. Basics are what the app serves by default, and
+                    // the song path is always reachable in one tap — SPEC §4
+                    // states note names must be "optional, late, never a gate",
+                    // and §4a-F exists because the trainer had made them THE gate.
+                    // What survives is resumption: launch lands where practice
+                    // stopped, which is the single best-evidenced UI finding in
+                    // the record (Ghibellini & Meier: resumption holds,
+                    // unfinished-progress framing does not).
+                    var path by remember {
+                        mutableStateOf(prefs.getString(PREF_LAST_PATH, PATH_BASICS))
                     }
-                    if (!foundationsDone) {
+                    fun goTo(next: String) {
+                        prefs.edit().putString(PREF_LAST_PATH, next).apply()
+                        path = next
+                    }
+                    if (path != PATH_SONG) {
                         FoundationsScreen(
                             engine = engine,
-                            onCompleted = { foundationsDone = true },
+                            onCompleted = { goTo(PATH_SONG) },
                             onExit = { screen = Screen.Shell },
                         )
                     } else {
@@ -142,12 +156,6 @@ fun FingerlyApp(
                 Screen.Dashboard -> DashboardScreen(
                     engine = engine,
                     onBack = { screen = Screen.Shell },
-                )
-
-                Screen.Basics -> FoundationsScreen(
-                    engine = engine,
-                    onCompleted = { screen = Screen.Shell },
-                    onExit = { screen = Screen.Shell },
                 )
 
                 Screen.Library -> LibraryScreen(
