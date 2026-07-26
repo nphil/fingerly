@@ -171,6 +171,28 @@ them and the drill screen scores the whole block. A hands-together prompt's
 latency is the slower of the two notes, because it is not finished until both
 have arrived.
 
+### The home screen is one action, not a dashboard
+
+The map opened onto thirteen rows reading "0/3 today · 0/3 days" with no legend,
+then two or three buttons. That is a decision menu before playing (SPEC §2), and
+a progress display nobody can decode is worse than none — it looks like
+information and carries none.
+
+What ships instead: the app picks the single next thing and states it. A title
+saying what you are about to do, one sentence of what it is, one button with the
+cost on it ("Start · 8 notes, about a minute"). Nothing else is a control.
+
+Standing state is two dim lines beneath. The **cold read is the headline**,
+because it is the only number on this screen that is not self-graded — a mastery
+map built from atoms the app itself chose can look green while nothing transfers,
+which is the documented hazard of self-developed instruments. The mastery rows
+still exist, behind a "Detail" toggle, and only there do they get a legend
+explaining what the counters mean.
+
+The four states are: no piano (say so, no button), a cold read is due, a drill is
+due, or nothing is due today — and the last one says why more today would not
+help, rather than leaving an empty screen.
+
 ### Onboarding is a demonstration, not an explanation
 
 §2 forbids every conventional option: no theory prerequisites, no text over

@@ -61,6 +61,8 @@ fun FoundationsScreen(engine: MidiEngine, onCompleted: () -> Unit, onExit: () ->
     var probeDue by remember { mutableStateOf(false) }
     var probeSummary by remember { mutableStateOf<String?>(null) }
     var bankExhausted by remember { mutableStateOf(false) }
+    var showDetails by remember { mutableStateOf(false) }
+    var lastProbe by remember { mutableStateOf<String?>(null) }
     var runningDrill by remember { mutableStateOf<FoundationsTrainer.Drill?>(null) }
     var summary by remember { mutableStateOf<String?>(null) }
     var version by remember { mutableStateOf(0) }
@@ -74,6 +76,9 @@ fun FoundationsScreen(engine: MidiEngine, onCompleted: () -> Unit, onExit: () ->
 
     LaunchedEffect(Unit) {
         trainer = FoundationsTrainer(repo.getSetting(SETTING_KEY)).apply { startSitting(dayIndex) }
+        repo.allProbes().lastOrNull()?.let {
+            lastProbe = "${it.hits}/${it.noteCount} pitches, ${it.avgAbsErrorMs}ms off"
+        }
         if (repo.probesToday(dayIndex) == 0) {
             val next = ExcerptBank.nextUnseen(repo.consumedExcerpts())
             if (next == null) bankExhausted = true else probeDue = true
@@ -285,98 +290,124 @@ fun FoundationsScreen(engine: MidiEngine, onCompleted: () -> Unit, onExit: () ->
             else -> {
                 val rows = remember(version) { t.masteryRows() }
                 val next = remember(version) { t.previewDrill() }
+                val solid = rows.count { it.mastered }
+
+                // ONE action, chosen by the app. SPEC §2 forbids a decision menu
+                // before playing, and thirteen counters with no legend is a menu
+                // wearing a progress bar. What is on screen is: what you are
+                // about to do, how long it takes, and one button.
+                val action: FoundationsAction = when {
+                    !midi.connected -> FoundationsAction(
+                        title = "Plug in your piano",
+                        detail = "USB-C. It is picked up automatically.",
+                        button = null,
+                    )
+                    probeDue -> FoundationsAction(
+                        title = "Play these four bars",
+                        detail = "You have not seen them before. Get it wrong — " +
+                            "this is the measurement, not a test you can fail.",
+                        button = "Start · about 40s",
+                        onClick = {
+                            scope.launch {
+                                probe = ExcerptBank.nextUnseen(repo.consumedExcerpts())
+                                if (probe == null) {
+                                    bankExhausted = true
+                                    probeDue = false
+                                }
+                            }
+                        },
+                    )
+                    next != null -> FoundationsAction(
+                        title = next.title,
+                        detail = next.tip
+                            ?: "A note appears on the staff. Find it on the piano.",
+                        button = "Start · ${next.prompts.size} notes, about a minute",
+                        onClick = {
+                            t.startDrill(next)
+                            persist(t)
+                            summary = null
+                            runningDrill = next
+                        },
+                    )
+                    else -> FoundationsAction(
+                        title = "Done for today",
+                        detail = "Come back tomorrow — the spacing is what makes it " +
+                            "stick, so more today would not help.",
+                        button = null,
+                    )
+                }
+
                 Column(
                     modifier = Modifier.align(Alignment.Center).padding(horizontal = 48.dp),
-                    verticalArrangement = Arrangement.spacedBy(6.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp),
                 ) {
-                    Text("Basics", style = MaterialTheme.typography.headlineMedium)
-                    rows.forEach { row ->
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text(
-                                (if (row.mastered) "✓ " else if (row.atCriterion) "· " else "  ") + row.label,
-                                Modifier.width(220.dp),
-                                color = if (row.mastered) Mint2 else Fg2,
-                            )
-                            Text(
-                                "${row.hitsToday}/${row.hitsWanted} today   " +
-                                    "${row.daysCredited}/${row.daysWanted} days" +
-                                    (if (row.rung > 0) "   +${row.rung} oct" else ""),
-                                color = Dim2,
-                            )
-                        }
+                    Text(action.title, style = MaterialTheme.typography.headlineMedium)
+                    Text(
+                        action.detail,
+                        color = Fg2,
+                        modifier = Modifier.widthIn(max = 620.dp),
+                    )
+                    if (action.button != null) {
+                        Button(onClick = action.onClick) { Text(action.button) }
                     }
+
+                    // What just happened, if anything did.
                     if (probeSummary != null) {
-                        Text(
-                            probeSummary!!, color = Fg2,
-                            modifier = Modifier.widthIn(max = 760.dp),
-                        )
+                        Text(probeSummary!!, color = Amber2, modifier = Modifier.widthIn(max = 700.dp))
+                    }
+                    if (summary != null) {
+                        Text(summary!!, color = Fg2, modifier = Modifier.widthIn(max = 700.dp))
                     }
                     if (bankExhausted) {
                         Text(
-                            "Every cold-read excerpt has been used. A second sighting " +
-                                "is not a cold read, so the measurement stops here.",
+                            "No unseen excerpts left, so the reading measurement stops here.",
                             color = Amber2,
-                            modifier = Modifier.widthIn(max = 760.dp),
+                            modifier = Modifier.widthIn(max = 700.dp),
                         )
                     }
-                    if (summary != null) {
-                        Text(summary!!, color = Fg2, modifier = Modifier.widthIn(max = 760.dp))
-                    }
-                    // The sitting's named finish state, always on screen. Stopping
-                    // early is the normal case, and a finish state only reachable
-                    // by exhaustion is one the learner never sees (SPEC §3.5).
+
+                    // Standing state, two lines. The READ is the headline because
+                    // it is the only number here that is not self-graded.
                     Text(
-                        remember(version) { t.sittingFinishLabel() },
-                        color = Mint2,
-                        modifier = Modifier.widthIn(max = 760.dp),
+                        "Reading: " + (lastProbe ?: "not measured yet"),
+                        color = Dim2,
                     )
-                    if (next?.tip != null) {
-                        Text(
-                            next.tip!!,
-                            color = Amber2,
-                            modifier = Modifier.widthIn(max = 760.dp),
-                        )
-                    }
-                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                        if (!midi.connected) {
-                            Text(
-                                "Piano not connected. Plug it in over USB-C — " +
-                                    "it is picked up automatically.",
-                                color = Amber2,
-                                modifier = Modifier.widthIn(max = 700.dp),
-                            )
-                        } else if (probeDue) {
-                            // The read comes FIRST, every sitting. It is a probe,
-                            // never a gate: failing it costs nothing and unlocks
-                            // nothing, which is what keeps it honest.
-                            Button(onClick = {
-                                scope.launch {
-                                    probe = ExcerptBank.nextUnseen(repo.consumedExcerpts())
-                                    if (probe == null) {
-                                        bankExhausted = true
-                                        probeDue = false
-                                    }
-                                }
-                            }) { Text("Read 4 bars · counts for nothing") }
-                            OutlinedButton(onClick = { probeDue = false }) { Text("Skip") }
-                        } else if (next != null) {
-                            Button(onClick = {
-                                t.startDrill(next)
-                                persist(t)
-                                summary = null
-                                runningDrill = next
-                            }) { Text("${next.prompts.size} keys · ~60s") }
-                        } else {
-                            Text(
-                                "Nothing left today.",
-                                color = Mint2,
-                                modifier = Modifier.widthIn(max = 700.dp),
-                            )
+                    Text(
+                        "Basics: $solid of ${rows.size} solid · " +
+                            t.sittingFinishLabel().replaceFirstChar { it.lowercase() },
+                        color = Dim2,
+                    )
+
+                    Row(horizontalArrangement = Arrangement.spacedBy(20.dp)) {
+                        OutlinedButton(onClick = { showDetails = !showDetails }) {
+                            Text(if (showDetails) "Hide detail" else "Detail")
                         }
-                        // Never gated. Basics are what the app serves by default;
-                        // the song path is always one tap away, and choosing it
-                        // sticks (SPEC §4: note names are never a gate).
                         OutlinedButton(onClick = onCompleted) { Text("Go to song") }
+                    }
+
+                    if (showDetails) {
+                        Text(
+                            "hits today / needed · separate days / needed. " +
+                                "A key is solid at 3 hits on 3 different days with no help.",
+                            color = Dim2,
+                            modifier = Modifier.widthIn(max = 700.dp),
+                        )
+                        rows.forEach { row ->
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text(
+                                    (if (row.mastered) "✓ " else if (row.atCriterion) "· " else "  ") +
+                                        row.label,
+                                    Modifier.width(240.dp),
+                                    color = if (row.mastered) Mint2 else Fg2,
+                                )
+                                Text(
+                                    "${row.hitsToday}/${row.hitsWanted}   " +
+                                        "${row.daysCredited}/${row.daysWanted} days" +
+                                        (if (row.rung > 0) "   +${row.rung} oct" else ""),
+                                    color = Dim2,
+                                )
+                            }
+                        }
                     }
                 }
             }
@@ -384,6 +415,14 @@ fun FoundationsScreen(engine: MidiEngine, onCompleted: () -> Unit, onExit: () ->
         BackText(onExit)
     }
 }
+
+/** The one thing to do next, and what it costs. Never more than one. */
+private class FoundationsAction(
+    val title: String,
+    val detail: String,
+    val button: String?,
+    val onClick: () -> Unit = {},
+)
 
 /** Which path the learner was last on. Resumption, not a gate. */
 const val PREF_LAST_PATH = "last_path"
