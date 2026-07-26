@@ -62,6 +62,8 @@ fun FoundationsScreen(engine: MidiEngine, onCompleted: () -> Unit, onExit: () ->
     var probeSummary by remember { mutableStateOf<String?>(null) }
     var bankExhausted by remember { mutableStateOf(false) }
     var showDetails by remember { mutableStateOf(false) }
+    var showBrief by remember { mutableStateOf(false) }
+    var logging by remember { mutableStateOf(RemoteLog.isEnabled()) }
     var lastProbe by remember { mutableStateOf<String?>(null) }
     var runningDrill by remember { mutableStateOf<FoundationsTrainer.Drill?>(null) }
     var summary by remember { mutableStateOf<String?>(null) }
@@ -377,12 +379,55 @@ fun FoundationsScreen(engine: MidiEngine, onCompleted: () -> Unit, onExit: () ->
                             t.sittingFinishLabel().replaceFirstChar { it.lowercase() },
                         color = Dim2,
                     )
+                    if (!logging) {
+                        // Answers "do I need logs on?" without having to ask.
+                        Text(
+                            "Remote logging is OFF — results stay on the tablet and the build cannot see them.",
+                            color = Amber2,
+                            modifier = Modifier.widthIn(max = 700.dp),
+                        )
+                    }
 
                     Row(horizontalArrangement = Arrangement.spacedBy(20.dp)) {
                         OutlinedButton(onClick = { showDetails = !showDetails }) {
                             Text(if (showDetails) "Hide detail" else "Detail")
                         }
+                        OutlinedButton(onClick = { showBrief = !showBrief }) {
+                            Text(if (showBrief) "Hide brief" else "What am I testing?")
+                        }
                         OutlinedButton(onClick = onCompleted) { Text("Go to song") }
+                    }
+
+                    if (showBrief) {
+                        // The app carries the ask instead of the learner having to
+                        // come and ask for it. Blunt and mechanical (SPEC §2.8).
+                        Column(
+                            modifier = Modifier.widthIn(max = 760.dp),
+                            verticalArrangement = Arrangement.spacedBy(4.dp),
+                        ) {
+                            Text("Build ${TestingBrief.BUILD}", color = Dim2)
+                            Text("Do this", color = Amber2)
+                            TestingBrief.doThis.forEach { Text("· $it", color = Fg2) }
+                            Text("What it decides", color = Amber2)
+                            TestingBrief.feeds.forEach { Text("· $it", color = Fg2) }
+                            Text("How long", color = Amber2)
+                            Text(TestingBrief.howLong, color = Fg2)
+                            Text(TestingBrief.blocking, color = Fg2)
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                            ) {
+                                Text(
+                                    "Remote logging: " + if (logging) "ON" else "OFF",
+                                    color = if (logging) Mint2 else Amber2,
+                                )
+                                OutlinedButton(onClick = {
+                                    logging = !logging
+                                    RemoteLog.setEnabled(context, logging)
+                                }) { Text(if (logging) "Turn off" else "Turn on") }
+                            }
+                            Text(TestingBrief.logsWhy, color = Dim2)
+                        }
                     }
 
                     if (showDetails) {

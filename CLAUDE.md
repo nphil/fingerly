@@ -31,6 +31,10 @@ sessions · decision menus before playing.
 
 ## Workflow
 - One phase per push (SPEC §7); run that phase's acceptance gate before calling it done.
+- **Update `app/ui/TestingBrief.kt` in any push that changes what the user should be
+  testing.** The app tells him what to do, what it decides, how long, and whether
+  logging must be on — he should never have to ask in chat. A stale brief is worse
+  than none, because it will be believed.
 - **Conventional commits always** (`feat:`, `fix:`, `feat!:`) — CI derives the version
   from them (SPEC §9).
 - Run `./gradlew test` before pushing; CI fails the build on test failure.
