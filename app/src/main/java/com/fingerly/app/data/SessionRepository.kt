@@ -260,6 +260,7 @@ class SessionRepository(private val db: FingerlyDatabase) {
                     expectedNote = r.expectedNote,
                     unaided = r.unaided,
                     revealed = r.revealed,
+                    demonstrated = r.demonstrated,
                     latencyMs = r.latencyMs,
                     wrongPressCount = r.wrongPresses.size,
                     octaveErrors = octave,

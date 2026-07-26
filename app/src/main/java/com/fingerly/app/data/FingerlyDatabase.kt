@@ -4,6 +4,8 @@ import android.content.Context
 import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
+import androidx.room.migration.Migration
+import androidx.sqlite.db.SupportSQLiteDatabase
 
 @Database(
     entities = [
@@ -16,7 +18,7 @@ import androidx.room.RoomDatabase
         AppSettingEntity::class,
         FoundationsTrialEntity::class,
     ],
-    version = 4,
+    version = 5,
     exportSchema = true,
 )
 abstract class FingerlyDatabase : RoomDatabase() {
@@ -30,6 +32,16 @@ abstract class FingerlyDatabase : RoomDatabase() {
     abstract fun foundationsTrialDao(): FoundationsTrialDao
 
     companion object {
+        /** Adds `demonstrated` so a scaffolded trial is distinguishable. */
+        val MIGRATION_4_5 = object : Migration(4, 5) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    "ALTER TABLE foundations_trials " +
+                        "ADD COLUMN demonstrated INTEGER NOT NULL DEFAULT 0",
+                )
+            }
+        }
+
         @Volatile
         private var instance: FingerlyDatabase? = null
 
@@ -40,9 +52,12 @@ abstract class FingerlyDatabase : RoomDatabase() {
                     FingerlyDatabase::class.java,
                     "fingerly.db",
                 )
-                    // Single-user app, pre-1.0: schema changes may drop local data.
-                    // Proper migrations start once real practice history exists.
-                    .fallbackToDestructiveMigration()
+                    // Real migrations from here on. `foundations_trials` is the
+                    // independent variable of SPEC §4a-F's falsification check,
+                    // and the module ahead of us bumps this schema repeatedly —
+                    // a destructive fallback would silently delete the history
+                    // at exactly the moment it starts to matter.
+                    .addMigrations(MIGRATION_4_5)
                     .build().also { instance = it }
             }
     }

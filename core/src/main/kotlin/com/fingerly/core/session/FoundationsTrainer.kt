@@ -241,6 +241,12 @@ class FoundationsTrainer(
         val latencyMs: Int,
         val expectedNote: Int,
         val wrongPresses: List<Int>,
+        /**
+         * The app showed the answer of its own accord (first meeting with the
+         * symbol). Earns nothing, exactly like a reveal — but it is not a
+         * failure to retrieve, and must never be reported as one.
+         */
+        val demonstrated: Boolean = false,
     )
 
     class MasteryRow(

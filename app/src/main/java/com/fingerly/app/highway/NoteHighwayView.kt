@@ -145,11 +145,23 @@ class NoteHighwayView(
 
     private var revealedIdx = -1
     private val revealedFlag = BooleanArray(notes.size)
+
+    /**
+     * Prompts the APP chose to show the answer to, kept separate from the ones
+     * the learner failed to retrieve in time. Both suppress credit, but only one
+     * of them is a miss, and reporting a demonstration as a miss makes a perfect
+     * first drill read as half wrong.
+     */
+    private val demonstratedFlag = BooleanArray(notes.size)
     private val twoGroupOffsets = intArrayOf(1, 3)
     private val threeGroupOffsets = intArrayOf(6, 8, 10)
 
     /** True when prompt [i] was revealed or force-advanced — not unaided. */
     fun wasRevealedAt(i: Int): Boolean = i < revealedFlag.size && revealedFlag[i]
+
+    /** True when prompt [i] was a demonstration: the app showed it, unprompted. */
+    fun wasDemonstratedAt(i: Int): Boolean =
+        i < demonstratedFlag.size && demonstratedFlag[i]
 
     private fun promptLabelAt(i: Int): String {
         val labels = promptLabels
@@ -383,6 +395,7 @@ class NoteHighwayView(
         wrongEventCount = 0
         revealedIdx = -1
         java.util.Arrays.fill(revealedFlag, false)
+        java.util.Arrays.fill(demonstratedFlag, false)
         java.util.Arrays.fill(waitLatencyMs, -1) // -1 = not measured (0 meant "instant")
         waitingNow = false
         waitPromptIdx = -1
@@ -497,7 +510,10 @@ class NoteHighwayView(
                     // is up immediately and the prompt earns nothing.
                     if (promptDemo?.getOrNull(waitFrom) == true) {
                         revealedIdx = waitFrom
-                        if (waitFrom < revealedFlag.size) revealedFlag[waitFrom] = true
+                        if (waitFrom < revealedFlag.size) {
+                            revealedFlag[waitFrom] = true
+                            demonstratedFlag[waitFrom] = true
+                        }
                     }
                 }
                 // Corrective feedback comes AFTER the retrieval attempt: hold the

@@ -14,6 +14,7 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -54,6 +55,11 @@ fun FoundationsScreen(engine: MidiEngine, onCompleted: () -> Unit, onExit: () ->
     var version by remember { mutableStateOf(0) }
 
     val dayIndex = remember { (System.currentTimeMillis() / 86_400_000L).toInt() }
+    // There is no other way to answer a prompt: the drill takes MIDI only. With
+    // no piano attached every prompt force-advances, so the run used to grind
+    // through ~100s of untouchable screen and then report "0/8 from memory" —
+    // a diagnosis of the learner for a fact about the cable.
+    val midi by engine.connectionState.collectAsState()
 
     LaunchedEffect(Unit) {
         trainer = FoundationsTrainer(repo.getSetting(SETTING_KEY)).apply { startSitting(dayIndex) }
@@ -71,22 +77,31 @@ fun FoundationsScreen(engine: MidiEngine, onCompleted: () -> Unit, onExit: () ->
                 .add(view.wrongPlayedNoteAt(k))
         }
         val results = d.prompts.mapIndexed { i, p ->
-            val revealed = view.wasRevealedAt(i)
+            val demonstrated = view.wasDemonstratedAt(i)
+            // A demonstration also sets the reveal flag (both withhold credit),
+            // but only a reveal the LEARNER ran out of time on is a retrieval
+            // failure. Conflating them made a flawless first drill — where every
+            // atom is met for the first time — report as half wrong.
+            val revealed = view.wasRevealedAt(i) && !demonstrated
             val latency = view.waitLatencyMsAt(i)
             FoundationsTrainer.PromptResult(
                 atomId = p.atomId,
-                // Unaided = first press correct AND no reveal was needed.
-                unaided = wrongByIdx[i].isNullOrEmpty() && !revealed && latency >= 0,
+                // Unaided = first press correct AND nothing was shown.
+                unaided = wrongByIdx[i].isNullOrEmpty() && !revealed &&
+                    !demonstrated && latency >= 0,
                 revealed = revealed,
                 latencyMs = latency,
                 expectedNote = p.midiNote,
                 wrongPresses = wrongByIdx[i] ?: emptyList(),
+                demonstrated = demonstrated,
             )
         }
         t.recordResults(results, dayIndex)
         persist(t)
 
-        val unaided = results.count { it.unaided }
+        val scored = results.filter { !it.demonstrated }
+        val unaided = scored.count { it.unaided }
+        val demoCount = results.count { it.demonstrated }
         val revealedCount = results.count { it.revealed }
         val latencies = results.filter { it.unaided && it.latencyMs >= 0 }.map { it.latencyMs }
         // Raw per-trial rows: the durable asset every future retune runs on.
@@ -95,13 +110,15 @@ fun FoundationsScreen(engine: MidiEngine, onCompleted: () -> Unit, onExit: () ->
         }
         RemoteLog.log(
             "foundations",
-            "${d.focusAtom} unaided=$unaided/${results.size} revealed=$revealedCount " +
+            "${d.focusAtom} unaided=$unaided/${scored.size} demo=$demoCount " +
+                "revealed=$revealedCount " +
                 "medianLat=${latencies.sorted().getOrNull(latencies.size / 2) ?: -1}ms " +
                 "rung=${t.atoms.getValue(d.focusAtom).rung} " +
                 "days=${t.atoms.getValue(d.focusAtom).daysCredited}",
         )
         summary = buildString {
-            append("$unaided/${results.size} from memory")
+            append("$unaided/${scored.size} from memory")
+            if (demoCount > 0) append(" · $demoCount shown for the first time")
             if (revealedCount > 0) append(" · $revealedCount needed the landmark")
             if (latencies.isNotEmpty()) {
                 append(" · ${latencies.sorted()[latencies.size / 2] / 1000f}s median")
@@ -181,12 +198,19 @@ fun FoundationsScreen(engine: MidiEngine, onCompleted: () -> Unit, onExit: () ->
                     if (next?.tip != null) {
                         Text(
                             next.tip!!,
-                            color = Color(0xFFFFB74D),
+                            color = Amber2,
                             modifier = Modifier.widthIn(max = 760.dp),
                         )
                     }
                     Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                        if (next != null) {
+                        if (!midi.connected) {
+                            Text(
+                                "Piano not connected. Plug it in over USB-C — " +
+                                    "it is picked up automatically.",
+                                color = Amber2,
+                                modifier = Modifier.widthIn(max = 700.dp),
+                            )
+                        } else if (next != null) {
                             Button(onClick = {
                                 t.startDrill(next)
                                 persist(t)
@@ -214,5 +238,6 @@ fun FoundationsScreen(engine: MidiEngine, onCompleted: () -> Unit, onExit: () ->
 const val PREF_FOUNDATIONS_DONE = "foundations_done"
 private const val SETTING_KEY = "foundations_trainer_state"
 private val Mint2 = Color(0xFF00E676)
+private val Amber2 = Color(0xFFFFB74D)
 private val Fg2 = Color(0xFFC8D2D7)
 private val Dim2 = Color(0xFF78828C)

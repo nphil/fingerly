@@ -1,5 +1,6 @@
 package com.fingerly.app.data
 
+import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.ForeignKey
 import androidx.room.Index
@@ -169,6 +170,13 @@ data class FoundationsTrialEntity(
     /** Correct on the first press with no reveal: the only thing that counts. */
     val unaided: Boolean,
     val revealed: Boolean,
+    /**
+     * The APP showed the answer of its own accord — the first meeting with a
+     * symbol. Distinct from [revealed], which also covers a failed retrieval,
+     * because the falsification check must be able to exclude scaffolded trials.
+     */
+    @ColumnInfo(defaultValue = "0")
+    val demonstrated: Boolean = false,
     /** Prompt→correct-key latency in ms, or -1 when never produced. */
     val latencyMs: Int,
     val wrongPressCount: Int,
