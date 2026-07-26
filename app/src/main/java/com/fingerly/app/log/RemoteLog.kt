@@ -47,7 +47,10 @@ object RemoteLog {
     private var running = false
 
     fun init(context: Context) {
-        enabled = context.getSharedPreferences("fingerly", 0).getBoolean(PREFS_KEY, false)
+        // ON by default while the fundamentals module is under test: the learner
+        // should not have to remember to switch on the only channel the build has
+        // for seeing what happened. Switchable from the testing brief.
+        enabled = context.getSharedPreferences("fingerly", 0).getBoolean(PREFS_KEY, true)
         if (enabled) ensureFlusher()
     }
 

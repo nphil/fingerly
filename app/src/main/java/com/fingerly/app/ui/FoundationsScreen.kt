@@ -70,9 +70,9 @@ fun FoundationsScreen(
     var showBrief by remember { mutableStateOf(false) }
     // Shown unprompted until the learner has actually played something, then it
     // stays available. Reference, never a gate — MIDI cannot see fingers.
-    var showHands by remember {
-        mutableStateOf(!prefs.getBoolean(PREF_HANDS_SEEN, false))
-    }
+    // Always on screen. It is reference, it is what he asked for twice, and
+    // hiding reference behind a toggle is how it stops being used.
+    val showHands = true
     var logging by remember { mutableStateOf(RemoteLog.isEnabled()) }
     var lastProbe by remember { mutableStateOf<String?>(null) }
     var runningDrill by remember { mutableStateOf<FoundationsTrainer.Drill?>(null) }
@@ -366,7 +366,7 @@ fun FoundationsScreen(
                         }) { Text(action.button) }
                     }
 
-                    if (showHands) HandPositionCard()
+                    if (showHands) KeyboardMap()
 
                     // What just happened, if anything did.
                     if (probeSummary != null) {
@@ -404,20 +404,16 @@ fun FoundationsScreen(
                     }
 
                     Row(horizontalArrangement = Arrangement.spacedBy(20.dp)) {
-                        OutlinedButton(onClick = { showDetails = !showDetails }) {
-                            Text(if (showDetails) "Hide detail" else "Detail")
-                        }
-                        OutlinedButton(onClick = { showHands = !showHands }) {
-                            Text(if (showHands) "Hide hands" else "Hands")
-                        }
                         OutlinedButton(onClick = {
                             prefs.edit().putBoolean(PREF_ORIENTATION_DONE, false).apply()
                             onRedoSetup()
-                        }) { Text("Redo setup") }
+                        }) { Text("Start over") }
                         OutlinedButton(onClick = { showBrief = !showBrief }) {
                             Text(if (showBrief) "Hide brief" else "What am I testing?")
                         }
-                        OutlinedButton(onClick = onCompleted) { Text("Go to song") }
+                        OutlinedButton(onClick = { showDetails = !showDetails }) {
+                            Text(if (showDetails) "Hide numbers" else "Numbers")
+                        }
                     }
 
                     if (showBrief) {

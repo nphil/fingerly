@@ -100,7 +100,7 @@ fun OrientationScreen(engine: MidiEngine, onDone: () -> Unit) {
             Text(current.title, style = MaterialTheme.typography.headlineMedium)
             Text(current.detail, color = OriFg, modifier = Modifier.widthIn(max = 700.dp))
 
-            if (current.showHands) HandPositionCard()
+            if (current.showHands) KeyboardMap()
 
             if (current.showStaff) {
                 Canvas(modifier = Modifier.fillMaxWidth().height(220.dp)) {

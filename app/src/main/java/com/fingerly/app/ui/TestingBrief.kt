@@ -14,7 +14,7 @@ package com.fingerly.app.ui
 object TestingBrief {
 
     /** Shown so a stale brief is visible as stale. */
-    const val BUILD = "F5c — guided first run, reachable cold-read floor, hand position"
+    const val BUILD = "F5d — foundations only, LP-380U keyboard map, logging on by default"
 
     /** The concrete ask. One line each, imperative, no preamble. */
     val doThis = listOf(
@@ -38,8 +38,8 @@ object TestingBrief {
             "because one read is noise and the whole point is the slope."
 
     const val logsWhy =
-        "Leave remote logging ON while testing. Drill and cold-read results are stored on the tablet either way, " +
-            "but the log is the only way the build sees them without you reporting by hand."
+        "Logging is ON by default now — you should not have to remember to switch on the only channel " +
+            "the build has for seeing what happened. Results are stored on the tablet either way."
 
     /** The one thing currently blocked on the learner, or null when nothing is. */
     const val blocking =

@@ -46,8 +46,10 @@ fun FingerlyApp(
     var screen by remember {
         mutableStateOf(
             // SPEC §1: the app opens directly into today's session — no menu
-            // navigation to start. First run goes through the checklist once.
-            if (prefs.getBoolean("checklist_done", false)) Screen.Session else Screen.Checklist,
+            // navigation to start, and no checklist in front of it either. The
+            // first run is the guided orientation, which is the checklist that
+            // matters: it verifies the piano works by asking for a real press.
+            Screen.Session,
         )
     }
     // The current song drives both sessions and free play; picked in Library.
@@ -63,11 +65,14 @@ fun FingerlyApp(
     if (relaunchSignal != null) {
         val relaunches by relaunchSignal.collectAsState()
         LaunchedEffect(relaunches) {
-            if (relaunches > 0 && prefs.getBoolean("checklist_done", false)) {
-                screen = Screen.Session
-            }
+            if (relaunches > 0) screen = Screen.Session
         }
     }
+
+    // FOUNDATIONS ONLY (user request). The song path, library, dashboard, highway,
+    // virtual piano and the nine-button shell all still exist and still build —
+    // they are simply not reachable while the module is what is being learned.
+    // One surface, one thing to do. Settings stays reachable for logging.
 
     MaterialTheme(colorScheme = DarkScheme) {
         Box(Modifier.fillMaxSize().background(Color.Black)) {
@@ -153,7 +158,7 @@ fun FingerlyApp(
                         FoundationsScreen(
                             engine = engine,
                             onCompleted = { goTo(PATH_SONG) },
-                            onExit = { screen = Screen.Shell },
+                            onExit = { screen = Screen.Settings },
                             onRedoSetup = { oriented = false },
                         )
                     } else {
