@@ -106,6 +106,32 @@ object ExcerptBank {
      */
     const val COLD_READ_TEMPO_BPM = 50.0
 
+    /** Milliseconds per beat at the cold-read tempo. */
+    const val COLD_READ_BEAT_MS = 60_000.0 / COLD_READ_TEMPO_BPM
+
+    /**
+     * The pitch-attribution window for a cold read, deliberately WIDE.
+     *
+     * Conditions 1 and 3 of the definition of done are separate — "≥90% correct
+     * pitches" and "played in time" — and the default ±150ms window collapses
+     * them into one. At this tempo a beat is 1200ms, so a beginner who reads
+     * every pitch correctly but arrives half a second late would score zero
+     * pitch accuracy AND take an extra-note penalty for each one: the
+     * instrument would report "cannot read music" about someone who just read
+     * it slowly.
+     *
+     * So pitch is attributed generously and timing is reported separately as
+     * error magnitude. The judge attributes a press to the CLOSEST pending
+     * match, so a wide window does not smear notes onto their neighbours.
+     */
+    const val COLD_READ_HIT_WINDOW_MS = 900L
+
+    /** Must exceed the window, or a note is retired while still reachable. */
+    const val COLD_READ_MISS_AFTER_MS = 1500L
+
+    /** One full bar of count-in before the first note. */
+    const val COLD_READ_LEAD_IN_MS = 4L * COLD_READ_BEAT_MS.toLong()
+
     /**
      * One token per beat. A pitch token starts a note; `-` extends the previous
      * note by one beat; `.` is a beat of silence; `|` is a barline and is only

@@ -196,4 +196,30 @@ class ExcerptBankTest {
         assertEquals(1, score.notes.minOf { it.measure })
         assertEquals(4, score.notes.maxOf { it.measure })
     }
+
+    @Test
+    fun pitchAndTimingAreMeasuredSeparately() {
+        // Conditions 1 and 3 of the definition of done are different questions.
+        // A window narrower than the beat would make a slow-but-correct read
+        // indistinguishable from an incorrect one, and the probe would report
+        // "cannot read music" about someone who simply read it slowly.
+        assertTrue(
+            "the pitch window must be generous relative to the beat",
+            ExcerptBank.COLD_READ_HIT_WINDOW_MS > ExcerptBank.COLD_READ_BEAT_MS / 2,
+        )
+        // …but not so wide that a press lands past the NEXT note's onset by more
+        // than the judge can resolve; it attributes to the closest match.
+        assertTrue(
+            ExcerptBank.COLD_READ_HIT_WINDOW_MS < ExcerptBank.COLD_READ_BEAT_MS,
+        )
+        // A note must never be retired while it is still reachable.
+        assertTrue(
+            ExcerptBank.COLD_READ_MISS_AFTER_MS > ExcerptBank.COLD_READ_HIT_WINDOW_MS,
+        )
+        // The count-in is a real bar at the stated tempo, not a round number.
+        assertEquals(
+            (4 * ExcerptBank.COLD_READ_BEAT_MS).toLong(),
+            ExcerptBank.COLD_READ_LEAD_IN_MS,
+        )
+    }
 }

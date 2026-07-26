@@ -192,9 +192,16 @@ fun FoundationsScreen(engine: MidiEngine, onCompleted: () -> Unit, onExit: () ->
                     modifier = Modifier.fillMaxSize(),
                     factory = { ctx ->
                         val sorted = e.notes.sortedWith(compareBy({ it.startBeat }, { it.midi }))
-                        NoteHighwayView(ctx, engine.ring, e.toScore()).apply {
+                        NoteHighwayView(
+                            ctx, engine.ring, e.toScore(),
+                            // Wide on purpose: pitch accuracy and timing are two
+                            // separate conditions, and the default ±150ms window
+                            // would score a slow-but-correct read as zero pitches.
+                            hitWindowMs = ExcerptBank.COLD_READ_HIT_WINDOW_MS,
+                            missAfterMs = ExcerptBank.COLD_READ_MISS_AFTER_MS,
+                        ).apply {
                             tapToRestart = false
-                            leadInMs = 4000 // a full bar of count-in at the stated tempo
+                            leadInMs = ExcerptBank.COLD_READ_LEAD_IN_MS
                             waitMode = false // condition 3: the read is played IN TIME
                             showHud = false
                             excerptMode = true
