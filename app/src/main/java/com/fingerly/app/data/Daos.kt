@@ -104,3 +104,18 @@ interface AppSettingDao {
     @Query("SELECT value FROM app_settings WHERE `key` = :key")
     suspend fun get(key: String): String?
 }
+
+@Dao
+interface FoundationsProbeDao {
+    @Insert
+    suspend fun insert(probe: FoundationsProbeEntity)
+
+    @Query("SELECT * FROM foundations_probes ORDER BY atEpochMs")
+    suspend fun all(): List<FoundationsProbeEntity>
+
+    @Query("SELECT COUNT(*) FROM foundations_probes WHERE dayIndex = :dayIndex")
+    suspend fun countForDay(dayIndex: Int): Int
+
+    @Query("SELECT excerptId FROM foundations_probes")
+    suspend fun consumedExcerptIds(): List<String>
+}

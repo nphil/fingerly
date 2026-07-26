@@ -213,7 +213,53 @@ Design choices from ADHD research that DID survive:
 3. Change it in ONE place; unit tests pin behavior; ship; watch the logs.
 4. Record the change and its rationale in this file.
 
+## The cold read is the instrument (SPEC §4a-F item F3)
+
+Everything else in this module is a proxy. The mastery map counts unaided hits
+on atoms the app itself chose, which means it can certify a skill that transfers
+nowhere — exactly the defect that made the previous trainer measure visual
+tracking. The cold read is the one measurement that cannot be drilled for,
+because the excerpt has never been seen.
+
+Its rules are what make it worth having, and each of them is load-bearing:
+
+- **It runs first, every sitting, from the very first one** — before any of it
+  is learnable. A probe introduced once the learner is good at the material
+  measures nothing about the journey.
+- **It gates nothing and unlocks nothing.** Failing costs nothing. The instant a
+  measurement has consequences the learner optimises for it, and the number
+  stops being evidence.
+- **Unseen is enforced.** Excerpts are consumed by id and never re-served;
+  exhaustion is surfaced rather than silently wrapping around.
+- **It is played in time, not spelled out.** `waitMode` is off, so the clock
+  runs — condition 3 of the definition of done is about timing, and a wait-mode
+  read would satisfy it trivially and falsely.
+- **No scaffold.** No falling notes, no lit keys, no landmark tint, no reveal.
+  The only moving thing is a cursor marking read position, which is not a
+  verdict. `scaffoldState` is logged with every row so condition 4 is checkable
+  after the fact rather than assumed.
+
+Density is graded across four tiers for one reason: if every excerpt were hard,
+the probe could floor at zero for a month, and a floored instrument is
+indistinguishable from atoms that do not transfer. That distinction is the
+entire content of the falsification check, so the instrument must be able to
+register partial credit before it is trusted to report none.
+
+Hands-together credit counts only at onsets where the parts are ≥14 semitones
+apart. MIDI carries pitch, not hands; anything closer could have been played
+with one hand. Same reasoning that deleted the fingering atoms.
+
 ## Change log
+
+- 2026-07 (F3): the cold read ships. `ExcerptBank` holds 20 four-bar excerpts in
+  G2–G4 across four density tiers, written one token per beat; `Staff` gained a
+  horizontal ruler so x-from-time and barline placement are unit-tested rather
+  than eyeballed; `StaffRenderer.drawExcerpt` draws the pair as one braced
+  system; `NoteHighwayView.excerptMode` runs it wait-free with no scaffold; and
+  `foundations_probes` records pitch accuracy, timing error and its coverage,
+  per-hand accuracy, separable hands-together onsets, and the scaffold state at
+  read time. The dependent variable of the falsification check now exists and is
+  being logged from the first sitting.
 
 - 2026-07 (roadmap reconciliation, F6a): two multi-agent passes — an end-to-end
   audit of the beginner journey and a reconciliation of the roadmap against all

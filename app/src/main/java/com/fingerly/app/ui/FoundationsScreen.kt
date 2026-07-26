@@ -27,10 +27,14 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import com.fingerly.app.data.FingerlyDatabase
+import com.fingerly.app.data.FoundationsProbeEntity
 import com.fingerly.app.data.SessionRepository
 import com.fingerly.app.highway.NoteHighwayView
 import com.fingerly.app.log.RemoteLog
 import com.fingerly.app.midi.MidiEngine
+import com.fingerly.core.notation.ExcerptBank
+import com.fingerly.core.notation.Staff
+import com.fingerly.core.song.ChartNote
 import com.fingerly.core.session.FoundationsTrainer
 import kotlinx.coroutines.launch
 
@@ -50,6 +54,13 @@ fun FoundationsScreen(engine: MidiEngine, onCompleted: () -> Unit, onExit: () ->
     val prefs = remember { context.getSharedPreferences("fingerly", 0) }
 
     var trainer by remember { mutableStateOf<FoundationsTrainer?>(null) }
+    // The cold read (SPEC §4a-F item F3): the sitting's FIRST act, every sitting,
+    // from the very first one — before any of it is learnable. It is the only
+    // measurement here that is not a proxy, and it gates nothing.
+    var probe by remember { mutableStateOf<ExcerptBank.Excerpt?>(null) }
+    var probeDue by remember { mutableStateOf(false) }
+    var probeSummary by remember { mutableStateOf<String?>(null) }
+    var bankExhausted by remember { mutableStateOf(false) }
     var runningDrill by remember { mutableStateOf<FoundationsTrainer.Drill?>(null) }
     var summary by remember { mutableStateOf<String?>(null) }
     var version by remember { mutableStateOf(0) }
@@ -63,6 +74,10 @@ fun FoundationsScreen(engine: MidiEngine, onCompleted: () -> Unit, onExit: () ->
 
     LaunchedEffect(Unit) {
         trainer = FoundationsTrainer(repo.getSetting(SETTING_KEY)).apply { startSitting(dayIndex) }
+        if (repo.probesToday(dayIndex) == 0) {
+            val next = ExcerptBank.nextUnseen(repo.consumedExcerpts())
+            if (next == null) bankExhausted = true else probeDue = true
+        }
     }
 
     fun persist(t: FoundationsTrainer) {
@@ -128,10 +143,79 @@ fun FoundationsScreen(engine: MidiEngine, onCompleted: () -> Unit, onExit: () ->
         version++
     }
 
+    fun onProbeEnded(judge: com.fingerly.core.play.HitJudge, e: ExcerptBank.Excerpt) {
+        val accuracy = judge.accuracyPercent()
+        scope.launch {
+            repo.saveProbe(
+                FoundationsProbeEntity(
+                    excerptId = e.id,
+                    tier = e.tier,
+                    atEpochMs = System.currentTimeMillis(),
+                    dayIndex = dayIndex,
+                    firstAttemptOfSitting = true,
+                    noteCount = judge.noteCount,
+                    hits = judge.hits,
+                    misses = judge.misses,
+                    extras = judge.extras,
+                    pitchAccuracy = accuracy,
+                    avgAbsErrorMs = judge.avgAbsErrorMs().toInt(),
+                    meanSignedErrMs = judge.meanSignedErrorMs().toInt(),
+                    timingCoverage = judge.timingCoverage(),
+                    leftAccuracy = judge.handAccuracyPercent(ChartNote.HAND_LEFT),
+                    rightAccuracy = judge.handAccuracyPercent(ChartNote.HAND_RIGHT),
+                    handsTogetherOnsets = e.scorableHandsTogetherOnsets(),
+                    // No scaffold is shown during a cold read; that is the point.
+                    scaffoldState = 0,
+                ),
+            )
+        }
+        RemoteLog.log(
+            "coldread",
+            "${e.id} tier=${e.tier} acc=${accuracy.toInt()}% " +
+                "hit=${judge.hits}/${judge.noteCount} " +
+                "err=${judge.avgAbsErrorMs()}ms cov=${(judge.timingCoverage() * 100).toInt()}%",
+        )
+        probeSummary = "Cold read: ${judge.hits}/${judge.noteCount} pitches, " +
+            "${judge.avgAbsErrorMs()}ms average timing. Counts for nothing — it is the measurement."
+        probe = null
+        probeDue = false
+    }
+
     val t = trainer
     Box(Modifier.fillMaxSize()) {
         when {
             t == null -> Text("Loading…", Modifier.align(Alignment.Center), color = Dim2)
+
+            probe != null -> {
+                val e = probe!!
+                AndroidView(
+                    modifier = Modifier.fillMaxSize(),
+                    factory = { ctx ->
+                        val sorted = e.notes.sortedWith(compareBy({ it.startBeat }, { it.midi }))
+                        NoteHighwayView(ctx, engine.ring, e.toScore()).apply {
+                            tapToRestart = false
+                            leadInMs = 4000 // a full bar of count-in at the stated tempo
+                            waitMode = false // condition 3: the read is played IN TIME
+                            showHud = false
+                            excerptMode = true
+                            excerptMidi = IntArray(sorted.size) { sorted[it].midi }
+                            excerptStartBeats = DoubleArray(sorted.size) { sorted[it].startBeat }
+                            excerptDurationBeats =
+                                DoubleArray(sorted.size) { sorted[it].durationBeats }
+                            excerptClefs = ByteArray(sorted.size) {
+                                if (sorted[it].hand == ChartNote.HAND_LEFT) {
+                                    Staff.CLEF_BASS.toByte()
+                                } else {
+                                    Staff.CLEF_TREBLE.toByte()
+                                }
+                            }
+                            excerptTotalBeats = e.totalBeats
+                            excerptBeatsPerBar = e.beatsPerBar
+                            onEnded = { judge -> onProbeEnded(judge, e) }
+                        }
+                    },
+                )
+            }
 
             runningDrill != null -> {
                 val d = runningDrill!!
@@ -191,6 +275,20 @@ fun FoundationsScreen(engine: MidiEngine, onCompleted: () -> Unit, onExit: () ->
                             )
                         }
                     }
+                    if (probeSummary != null) {
+                        Text(
+                            probeSummary!!, color = Fg2,
+                            modifier = Modifier.widthIn(max = 760.dp),
+                        )
+                    }
+                    if (bankExhausted) {
+                        Text(
+                            "Every cold-read excerpt has been used. A second sighting " +
+                                "is not a cold read, so the measurement stops here.",
+                            color = Amber2,
+                            modifier = Modifier.widthIn(max = 760.dp),
+                        )
+                    }
                     if (summary != null) {
                         Text(summary!!, color = Fg2, modifier = Modifier.widthIn(max = 760.dp))
                     }
@@ -217,6 +315,20 @@ fun FoundationsScreen(engine: MidiEngine, onCompleted: () -> Unit, onExit: () ->
                                 color = Amber2,
                                 modifier = Modifier.widthIn(max = 700.dp),
                             )
+                        } else if (probeDue) {
+                            // The read comes FIRST, every sitting. It is a probe,
+                            // never a gate: failing it costs nothing and unlocks
+                            // nothing, which is what keeps it honest.
+                            Button(onClick = {
+                                scope.launch {
+                                    probe = ExcerptBank.nextUnseen(repo.consumedExcerpts())
+                                    if (probe == null) {
+                                        bankExhausted = true
+                                        probeDue = false
+                                    }
+                                }
+                            }) { Text("Read 4 bars · counts for nothing") }
+                            OutlinedButton(onClick = { probeDue = false }) { Text("Skip") }
                         } else if (next != null) {
                             Button(onClick = {
                                 t.startDrill(next)

@@ -274,6 +274,21 @@ class SessionRepository(private val db: FingerlyDatabase) {
     suspend fun foundationsTrials(): List<FoundationsTrialEntity> =
         withContext(Dispatchers.IO) { db.foundationsTrialDao().all() }
 
+    // ---------------------------------------------------------- cold read (F3)
+
+    suspend fun saveProbe(probe: FoundationsProbeEntity) =
+        withContext(Dispatchers.IO) { db.foundationsProbeDao().insert(probe) }
+
+    suspend fun probesToday(dayIndex: Int): Int =
+        withContext(Dispatchers.IO) { db.foundationsProbeDao().countForDay(dayIndex) }
+
+    /** Excerpts already read. A second sighting is not a cold read. */
+    suspend fun consumedExcerpts(): Set<String> =
+        withContext(Dispatchers.IO) { db.foundationsProbeDao().consumedExcerptIds().toSet() }
+
+    suspend fun allProbes(): List<FoundationsProbeEntity> =
+        withContext(Dispatchers.IO) { db.foundationsProbeDao().all() }
+
     suspend fun getSetting(key: String): String? =
         withContext(Dispatchers.IO) { db.appSettingDao().get(key) }
 

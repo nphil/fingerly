@@ -127,6 +127,23 @@ class NoteHighwayView(
      */
     var promptDemo: BooleanArray? = null
 
+    /**
+     * Cold-read mode (SPEC §4a-F item F3): the excerpt is drawn as notation and
+     * NOTHING else is shown — no falling notes, no lit keys, no landmark tint,
+     * no reveal. The clock does not wait, because condition 3 of the definition
+     * of done requires the read to be played *in time*, not spelled out.
+     *
+     * The only moving thing is a cursor on the note the judge is waiting for,
+     * which is read position rather than a verdict.
+     */
+    var excerptMode = false
+    var excerptMidi: IntArray? = null
+    var excerptStartBeats: DoubleArray? = null
+    var excerptDurationBeats: DoubleArray? = null
+    var excerptClefs: ByteArray? = null
+    var excerptTotalBeats = 16.0
+    var excerptBeatsPerBar = 4
+
     /** Built lazily on the first staff prompt so text-only runs never load a font. */
     private var staffRenderer: StaffRenderer? = null
 
@@ -359,7 +376,7 @@ class NoteHighwayView(
         // Font loading is I/O, so it happens here and never in the frame loop
         // (SPEC §1) — and only when this run actually contains notation.
         if (staffRenderer == null &&
-            promptRender?.any { it.toInt() == RENDER_STAFF } == true
+            (excerptMode || promptRender?.any { it.toInt() == RENDER_STAFF } == true)
         ) {
             staffRenderer = StaffRenderer(context)
         }
@@ -590,7 +607,10 @@ class NoteHighwayView(
 
     override fun onDraw(canvas: Canvas) {
         canvas.drawColor(Color.BLACK)
-        drawNotes(canvas)
+        // A cold read shows the notation and nothing else. Falling notes are the
+        // answer drawn at the right x-position, which is exactly what the read
+        // is testing the learner to work out.
+        if (!excerptMode) drawNotes(canvas)
         drawParticles(canvas)
         drawKeyboard(canvas)
         // Beat pulse: the hit line brightens on every beat so timed reps have a
@@ -610,7 +630,8 @@ class NoteHighwayView(
             // the finish state is continuously visible (Plichta & Scheres).
             drawDrillProgress(canvas)
         }
-        if (waitingNow) {
+        if (excerptMode) drawExcerpt(canvas)
+        if (waitingNow && !excerptMode) {
             if (renderOf(waitPromptIdx) == RENDER_STAFF) {
                 drawStaffPrompt(canvas, waitPromptIdx)
             } else {
@@ -804,6 +825,35 @@ class NoteHighwayView(
     }
 
     // ------------------------------------------------------------------ HUD / logs
+
+    /** The cold read: the whole excerpt, with a cursor on the next note due. */
+    private fun drawExcerpt(canvas: Canvas) {
+        val renderer = staffRenderer ?: return
+        val midi = excerptMidi ?: return
+        val starts = excerptStartBeats ?: return
+        val durs = excerptDurationBeats ?: return
+        val clefs = excerptClefs ?: return
+        // The cursor is the first note still pending — where the reader is, not
+        // how well they are doing.
+        var cursor = -1
+        var i = 0
+        while (i < notes.size) {
+            if (judge.stateOf(i) == HitJudge.STATE_PENDING) { cursor = i; break }
+            i++
+        }
+        renderer.drawExcerpt(
+            canvas = canvas,
+            midi = midi, startBeats = starts, durationBeats = durs, clefs = clefs,
+            count = minOf(midi.size, starts.size, durs.size, clefs.size),
+            totalBeats = excerptTotalBeats,
+            beatsPerBar = excerptBeatsPerBar,
+            centerX = width * 0.5f,
+            midiCenterY = keyboardTop * 0.46f,
+            staffSpace = keyboardTop * 0.040f,
+            staffWidth = width * 0.82f,
+            cursor = cursor,
+        )
+    }
 
     /**
      * The notated prompt. Sized off the playfield rather than fixed pixels so

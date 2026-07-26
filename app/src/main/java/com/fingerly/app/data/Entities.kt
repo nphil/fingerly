@@ -185,6 +185,46 @@ data class FoundationsTrialEntity(
     val otherErrors: Int,
 )
 
+/**
+ * One cold read (SPEC §4a-F item F3): the module's only non-proxy measurement.
+ *
+ * It is scored and shown, and it gates nothing, unlocks nothing and feeds no
+ * atom's mastery. Its whole purpose is to be the dependent variable of the
+ * falsification check — regress accuracy here on atoms-brought-to-criterion,
+ * and if the atoms do not predict the read, the atoms are wrong.
+ *
+ * [scaffoldState] records what help was on screen at the time, because
+ * condition 4 of the definition of done requires the read to have been taken
+ * with none.
+ */
+@Entity(tableName = "foundations_probes", indices = [Index("dayIndex")])
+data class FoundationsProbeEntity(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val excerptId: String,
+    val tier: Int,
+    val atEpochMs: Long,
+    val dayIndex: Int,
+    /** True when this was the sitting's FIRST attempt — condition 5. */
+    val firstAttemptOfSitting: Boolean,
+    val noteCount: Int,
+    val hits: Int,
+    val misses: Int,
+    val extras: Int,
+    /** Percent of written pitches played correctly — condition 1. */
+    val pitchAccuracy: Float,
+    /** Mean absolute timing error over hits, ms — condition 3. */
+    val avgAbsErrorMs: Int,
+    val meanSignedErrMs: Int,
+    /** Fraction of written notes actually hit; the denominator of the above. */
+    val timingCoverage: Float,
+    val leftAccuracy: Float,
+    val rightAccuracy: Float,
+    /** Onsets in this excerpt where the hands are separably far apart. */
+    val handsTogetherOnsets: Int,
+    /** Non-zero while any scaffold was showing; 0 is what condition 4 requires. */
+    val scaffoldState: Int,
+)
+
 /** Simple local key-value settings (first-run checklist state, current song, …). */
 @Entity(tableName = "app_settings")
 data class AppSettingEntity(
